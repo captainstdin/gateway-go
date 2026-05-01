@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GatewayWorker-Go Dashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#080a12;color:#e0e0e0;font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden;height:100vh}
+.header{background:linear-gradient(135deg,#1a1d2e,#252a3a);padding:10px 20px;border-bottom:1px solid #2d3348;display:flex;align-items:center;gap:14px;position:relative;z-index:10}
+.header h1{font-size:16px;font-weight:600;background:linear-gradient(135deg,#60a5fa,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header .dot{width:7px;height:7px;border-radius:50%;background:#22c55e;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.header .time{margin-left:auto;color:#666;font-size:12px}
+.stats{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:10px;z-index:10}
+.stat-card{background:rgba(18,20,30,.9);border:1px solid #2d3348;border-radius:6px;padding:6px 16px;display:flex;align-items:center;gap:8px}
+.stat-card .label{font-size:11px;color:#666}
+.stat-card .value{font-size:18px;font-weight:700;background:linear-gradient(135deg,#60a5fa,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+#canvas3d{position:fixed;top:0;left:0;width:100%;height:100%;z-index:1}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="dot" id="statusDot"></div>
+  <h1>GatewayWorker-Go</h1>
+  <div class="time" id="updateTime">--:--:--</div>
+</div>
+<div id="canvas3d"></div>
+<div class="stats">
+  <div class="stat-card"><span class="label">在线连接</span><span class="value" id="totalClients">0</span></div>
+  <div class="stat-card"><span class="label">Gateway</span><span class="value" id="totalGateways">0</span></div>
+  <div class="stat-card"><span class="label">Worker</span><span class="value" id="totalWorkers">0</span></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+var data = null;
+
+var scene = new THREE.Scene();
+scene.background = new THREE.Color(0x080a12);
+
+var camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 50);
+camera.position.set(0, 2.8, 5.5);
+
+var renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+document.getElementById('canvas3d').appendChild(renderer.domElement);
+
+var controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.1;
+controls.minDistance = 1.5;
+controls.maxDistance = 12;
+controls.update();
+
+window.addEventListener('resize', function() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// lights
+var ambient = new THREE.AmbientLight(0x606080, 0.7);
+scene.add(ambient);
+var dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+dirLight.position.set(5, 10, 5);
+scene.add(dirLight);
+var dirLight2 = new THREE.DirectionalLight(0x8888ff, 0.25);
+dirLight2.position.set(-3, 5, -5);
+scene.add(dirLight2);
+
+// grid
+var grid = new THREE.GridHelper(8, 8, 0x181e30, 0x111624);
+grid.position.y = -1.0;
+scene.add(grid);
+scene.fog = new THREE.Fog(0x080a12, 6, 12);
+
+var nodeGroup = new THREE.Group();
+scene.add(nodeGroup);
+var connGroup = new THREE.Group();
+scene.add(connGroup);
+
+// ── helper: label with dark badge ──
+function makeLabel(text, textColor, fontSize) {
+  var c = document.createElement('canvas');
+  var ctx = c.getContext('2d');
+  c.width = 512; c.height = 100;
+  ctx.clearRect(0, 0, 512, 100);
+  ctx.fillStyle = textColor || '#94a3b8';
+  ctx.font = 'bold ' + (fontSize || 38) + 'px "Consolas","Segoe UI",sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 256, 52);
+  var tex = new THREE.CanvasTexture(c);
+  tex.needsUpdate = true;
+  var mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, sizeAttenuation: true });
+  return new THREE.Sprite(mat);
+}
+
+// ── helper: connection line ──
+function makeLine(p1, p2, color, opacity, dashed) {
+  var pts = [new THREE.Vector3(p1.x, p1.y, p1.z), new THREE.Vector3(p2.x, p2.y, p2.z)];
+  var geo = new THREE.BufferGeometry().setFromPoints(pts);
+  var mat = dashed
+    ? new THREE.LineDashedMaterial({ color: color, transparent: true, opacity: opacity, dashSize: 0.06, gapSize: 0.05 })
+    : new THREE.LineBasicMaterial({ color: color, transparent: true, opacity: opacity });
+  var line = new THREE.Line(geo, mat);
+  if (dashed) line.computeLineDistances();
+  return line;
+}
+
+// ── build a RACK SERVER shape ──
+function buildRackServer(x, y, z, baseColor, edgeColor) {
+  var g = new THREE.Group();
+  g.position.set(x, y, z);
+
+  // chassis (main body)
+  var body = new THREE.Mesh(
+    new THREE.BoxGeometry(0.9, 0.28, 0.45),
+    new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.4, metalness: 0.2 })
+  );
+  g.add(body);
+
+  // edge outline
+  var edge = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(0.9, 0.28, 0.45)),
+    new THREE.LineBasicMaterial({ color: edgeColor, transparent: true, opacity: 0.4 })
+  );
+  g.add(edge);
+
+  // front bezel (slightly proud of the front face)
+  var bezel = new THREE.Mesh(
+    new THREE.BoxGeometry(0.86, 0.24, 0.04),
+    new THREE.MeshStandardMaterial({ color: 0x1a1c2a, roughness: 0.6 })
+  );
+  bezel.position.set(0.45, 0, 0);
+  g.add(bezel);
+
+  // drive bays (3 dark slots on front)
+  for (var i = 0; i < 3; i++) {
+    var bay = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.03, 0.025),
+      new THREE.MeshBasicMaterial({ color: 0x0a0a12 })
+    );
+    bay.position.set(0.47, 0.06 - i * 0.07, -0.06 + i * 0.06);
+    g.add(bay);
+  }
+
+  // rack ears (L/R mounting brackets)
+  var earMat = new THREE.MeshStandardMaterial({ color: 0x888, metalness: 0.5, roughness: 0.3 });
+  var earGeo = new THREE.BoxGeometry(0.03, 0.22, 0.04);
+  var earL = new THREE.Mesh(earGeo, earMat);
+  earL.position.set(-0.46, 0, -0.24);
+  g.add(earL);
+  var earR = new THREE.Mesh(earGeo, earMat);
+  earR.position.set(-0.46, 0, 0.24);
+  g.add(earR);
+
+  // power LED
+  var pwr = new THREE.Mesh(
+    new THREE.SphereGeometry(0.025, 6, 6),
+    new THREE.MeshBasicMaterial({ color: 0x22c55e })
+  );
+  pwr.position.set(0.47, 0.1, 0.14);
+  g.add(pwr);
+
+  // activity LED (blinking amber)
+  var act = new THREE.Mesh(
+    new THREE.SphereGeometry(0.02, 6, 6),
+    new THREE.MeshBasicMaterial({ color: 0xf59e0b })
+  );
+  act.position.set(0.47, 0.1, 0.1);
+  g.add(act);
+
+  // glow ring under
+  var ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.5, 0.65, 24),
+    new THREE.MeshBasicMaterial({ color: baseColor, transparent: true, opacity: 0.12, side: THREE.DoubleSide })
+  );
+  ring.position.set(0, -0.16, 0);
+  ring.rotation.x = -Math.PI / 2;
+  g.add(ring);
+
+  nodeGroup.add(g);
+  return {x: x, y: y, z: z};
+}
+
+// ── build a NETWORK SWITCH shape ──
+function buildSwitch(x, y, z, baseColor, edgeColor) {
+  var g = new THREE.Group();
+  g.position.set(x, y, z);
+
+  // chassis (wider, flatter than a server)
+  var body = new THREE.Mesh(
+    new THREE.BoxGeometry(1.1, 0.18, 0.35),
+    new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.35, metalness: 0.25 })
+  );
+  g.add(body);
+
+  // edge outline
+  var edge = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(1.1, 0.18, 0.35)),
+    new THREE.LineBasicMaterial({ color: edgeColor, transparent: true, opacity: 0.5 })
+  );
+  g.add(edge);
+
+  // front face plate
+  var face = new THREE.Mesh(
+    new THREE.BoxGeometry(1.06, 0.14, 0.03),
+    new THREE.MeshStandardMaterial({ color: 0x1a1c2a, roughness: 0.6 })
+  );
+  face.position.set(0.55, 0, 0);
+  g.add(face);
+
+  // row of port LEDs along the front
+  var portCount = 8;
+  for (var i = 0; i < portCount; i++) {
+    var px = 0.57;
+    var pz = -0.14 + (i / (portCount - 1)) * 0.28;
+    var led = new THREE.Mesh(
+      new THREE.BoxGeometry(0.02, 0.02, 0.025),
+      new THREE.MeshBasicMaterial({ color: 0x22c55e })
+    );
+    led.position.set(px, 0.04, pz);
+    g.add(led);
+    // port socket outline
+    var socket = new THREE.Mesh(
+      new THREE.BoxGeometry(0.015, 0.01, 0.015),
+      new THREE.MeshBasicMaterial({ color: 0x2a2a3a })
+    );
+    socket.position.set(px, -0.02, pz);
+    g.add(socket);
+  }
+
+  // ventilation slots on side
+  for (var i = 0; i < 4; i++) {
+    var vent = new THREE.Mesh(
+      new THREE.BoxGeometry(0.02, 0.01, 0.04),
+      new THREE.MeshBasicMaterial({ color: 0x0a0a12 })
+    );
+    vent.position.set(-0.2 + i * 0.12, 0.07, 0.18);
+    g.add(vent);
+  }
+
+  // rack ears
+  var earMat = new THREE.MeshStandardMaterial({ color: 0x888, metalness: 0.5, roughness: 0.3 });
+  var earGeo = new THREE.BoxGeometry(0.03, 0.14, 0.04);
+  var earL = new THREE.Mesh(earGeo, earMat);
+  earL.position.set(-0.56, 0, -0.19);
+  g.add(earL);
+  var earR = new THREE.Mesh(earGeo, earMat);
+  earR.position.set(-0.56, 0, 0.19);
+  g.add(earR);
+
+  // glow ring
+  var ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.6, 0.75, 24),
+    new THREE.MeshBasicMaterial({ color: baseColor, transparent: true, opacity: 0.1, side: THREE.DoubleSide })
+  );
+  ring.position.set(0, -0.12, 0);
+  ring.rotation.x = -Math.PI / 2;
+  g.add(ring);
+
+  nodeGroup.add(g);
+  return {x: x, y: y, z: z};
+}
+
+// ── build scene ──
+function buildScene() {
+  while(nodeGroup.children.length) nodeGroup.remove(nodeGroup.children[0]);
+  while(connGroup.children.length) connGroup.remove(connGroup.children[0]);
+
+  if (!data) return;
+
+  var gateways = data.gateways || [];
+  var workers = data.workers || [];
+  var gwc = gateways.length;
+  var wkc = workers.length;
+  var clientCount = Math.min(data.total_clients || 0, 10);
+
+  if (gwc === 0 && wkc === 0) return;
+
+  var clX = -1.8, gwX = 0, wkX = 1.8;
+  var spacing = 0.9;
+  var gwStartZ = -((Math.max(gwc, 1) - 1) * spacing) / 2;
+  var wkStartZ = -((Math.max(wkc, 1) - 1) * spacing) / 2;
+
+  var gwPos = [], wkPos = [], clPos = [];
+
+  // Gateway = Network Switch (center column)
+  for (var i = 0; i < gwc; i++) {
+    var z = gwStartZ + i * spacing;
+    var p = buildSwitch(gwX, 0, z, 0x2a5a9a, '#60a5fa');
+    gwPos.push(p);
+
+    var addr = gateways[i] ? gateways[i].addr : '-';
+    var cnt = gateways[i] ? gateways[i].client_count : 0;
+    var lbl = makeLabel(addr + ' | ' + cnt + ' online', '#60a5fa', 30);
+    lbl.position.set(gwX, 0.5, z);
+    lbl.scale.set(1.8, 0.36, 1);
+    nodeGroup.add(lbl);
+  }
+
+  // section label
+  if (gwc > 0) {
+    var t = makeLabel('GATEWAY (Switch)', '#3a7bd5', 28);
+    t.position.set(gwX, 1.1, gwStartZ - spacing * 0.5 - 0.5);
+    t.scale.set(1.8, 0.36, 1);
+    nodeGroup.add(t);
+  }
+
+  // Worker = Rack Server (right column)
+  for (var i = 0; i < wkc; i++) {
+    var z = wkStartZ + i * spacing;
+    var p = buildRackServer(wkX, 0, z, 0x4a1a7a, '#a78bfa');
+    wkPos.push(p);
+
+    var wrk = workers[i];
+    var wname = wrk ? (wrk.name || 'worker') : 'worker';
+    var cnt = wrk ? wrk.processed_count : 0;
+    var lbl = makeLabel(wname + ' | ' + cnt.toLocaleString(), '#a78bfa', 30);
+    lbl.position.set(wkX, 0.5, z);
+    lbl.scale.set(1.8, 0.36, 1);
+    nodeGroup.add(lbl);
+  }
+
+  if (wkc > 0) {
+    var t = makeLabel('WORKER (Server)', '#7c3aed', 28);
+    t.position.set(wkX, 1.1, wkStartZ - spacing * 0.5 - 0.5);
+    t.scale.set(1.8, 0.36, 1);
+    nodeGroup.add(t);
+  }
+
+  // Clients (left) - desktop PC towers facing Gateway
+  if (data.total_clients > 0) {
+    var clientColors = [0x4a5a6a, 0x5a4a6a, 0x4a5a5a];
+
+    for (var i = 0; i < clientCount; i++) {
+      var z = -1.8 + (i / Math.max(clientCount - 1, 1)) * 3.6;
+
+      // desktop tower (main box)
+      var towerMat = new THREE.MeshStandardMaterial({
+        color: clientColors[i % 3],
+        roughness: 0.5,
+        metalness: 0.1
+      });
+      var tower = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.22, 0.12), towerMat);
+      tower.position.set(clX - 0.05, 0, z);
+      nodeGroup.add(tower);
+      var towerEdge = new THREE.LineSegments(
+        new THREE.EdgesGeometry(new THREE.BoxGeometry(0.15, 0.22, 0.12)),
+        new THREE.LineBasicMaterial({ color: 0x6a7a8a, transparent: true, opacity: 0.3 })
+      );
+      towerEdge.position.copy(tower.position);
+      nodeGroup.add(towerEdge);
+
+      // monitor screen (facing right toward Gateway)
+      var screenMat = new THREE.MeshStandardMaterial({
+        color: 0x2a3a4a,
+        emissive: 0x1a3a6a,
+        emissiveIntensity: 0.15
+      });
+      var screen = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.14, 0.16), screenMat);
+      screen.position.set(clX + 0.1, 0.08, z);
+      nodeGroup.add(screen);
+
+      // screen content glow (blue tint)
+      var glow2 = new THREE.Mesh(
+        new THREE.BoxGeometry(0.005, 0.1, 0.12),
+        new THREE.MeshBasicMaterial({ color: 0x3a7bd5, transparent: true, opacity: 0.25 })
+      );
+      glow2.position.set(clX + 0.105, 0.08, z);
+      nodeGroup.add(glow2);
+
+      // screen bezel edge
+      var bezel = new THREE.LineSegments(
+        new THREE.EdgesGeometry(new THREE.BoxGeometry(0.02, 0.14, 0.16)),
+        new THREE.LineBasicMaterial({ color: 0x5a6a7a, transparent: true, opacity: 0.4 })
+      );
+      bezel.position.copy(screen.position);
+      nodeGroup.add(bezel);
+
+      // small base
+      var base2 = new THREE.Mesh(
+        new THREE.BoxGeometry(0.04, 0.02, 0.08),
+        new THREE.MeshStandardMaterial({ color: 0x2a2a3a })
+      );
+      base2.position.set(clX + 0.1, -0.08, z);
+      nodeGroup.add(base2);
+
+      clPos.push({x: clX, y: 0, z: z});
+    }
+
+    var l = makeLabel('CLIENTS (' + data.total_clients + ')', '#94a3b8', 28);
+    l.position.set(clX, 1.2, 0);
+    l.scale.set(1.8, 0.36, 1);
+    nodeGroup.add(l);
+  }
+
+  // connection lines: Gateway <-> Worker (cross)
+  for (var gi = 0; gi < gwPos.length; gi++) {
+    for (var wi = 0; wi < wkPos.length; wi++) {
+      connGroup.add(makeLine(gwPos[gi], wkPos[wi], 0x4a8bf5, 0.3, false));
+    }
+  }
+
+  // connection lines: Client -> Gateway
+  for (var ci = 0; ci < clPos.length && gwPos.length > 0; ci++) {
+    var gi = ci % gwPos.length;
+    connGroup.add(makeLine(clPos[ci], gwPos[gi], 0x6a7b8a, 0.18, true));
+  }
+}
+
+function animate() {
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+}
+
+var ws = new WebSocket((location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host + '/ws');
+ws.onmessage = function(e) {
+  data = JSON.parse(e.data);
+  document.getElementById('totalClients').textContent = data.total_clients;
+  document.getElementById('totalGateways').textContent = data.gateways ? data.gateways.length : 0;
+  document.getElementById('totalWorkers').textContent = data.total_workers;
+  document.getElementById('updateTime').textContent = data.update_time;
+  buildScene();
+};
+ws.onclose = function() {
+  document.getElementById('statusDot').style.background = '#ef4444';
+};
+
+buildScene();
+animate();
+})();
+</script>
+</body>
+</html>

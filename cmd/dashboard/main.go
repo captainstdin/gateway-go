@@ -15,6 +15,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	_ "embed"
 
 	"github.com/gorilla/websocket"
 )
@@ -70,8 +71,8 @@ func (d *Dashboard) run() {
 	for _, addr := range d.registerAddr {
 		go d.connectRegister(addr)
 	}
-	// Periodically query gateway client counts
-	go d.pollGatewayStats()
+	// Periodically poll gateway for client counts & worker stats
+	go d.pollStats()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", d.handleIndex)
@@ -136,7 +137,6 @@ func (d *Dashboard) connectRegister(regAddr string) {
 				d.gatewayAddrs = msg.Gateways
 				d.workers = msg.Workers
 				d.mu.Unlock()
-				d.broadcast()
 			}
 		}
 		conn.Close()
@@ -145,8 +145,8 @@ func (d *Dashboard) connectRegister(regAddr string) {
 	}
 }
 
-func (d *Dashboard) pollGatewayStats() {
-	ticker := time.NewTicker(3 * time.Second)
+func (d *Dashboard) pollStats() {
+	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 	for range ticker.C {
 		d.mu.RLock()
@@ -335,77 +335,8 @@ func (d *Dashboard) handleIndex(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, dashboardHTML)
 }
 
-const dashboardHTML = `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GatewayWorker-Go Dashboard</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#0f1117;color:#e0e0e0;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
-.header{background:linear-gradient(135deg,#1a1d2e,#252a3a);padding:20px 32px;border-bottom:1px solid #2d3348;display:flex;align-items:center;gap:16px}
-.header h1{font-size:22px;font-weight:600;background:linear-gradient(135deg,#60a5fa,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.header .dot{width:10px;height:10px;border-radius:50%;background:#22c55e;animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-.header .time{margin-left:auto;color:#888;font-size:13px}
-.stats{display:flex;gap:16px;padding:20px 32px}
-.stat-card{flex:1;background:linear-gradient(135deg,#1e2235,#252a3e);border:1px solid #2d3348;border-radius:12px;padding:20px;text-align:center}
-.stat-card .label{font-size:12px;color:#888;text-transform:uppercase;letter-spacing:1px}
-.stat-card .value{font-size:36px;font-weight:700;margin-top:4px;background:linear-gradient(135deg,#60a5fa,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.section{padding:12px 32px}
-.section h2{font-size:15px;color:#888;margin-bottom:12px;text-transform:uppercase;letter-spacing:1px}
-.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
-.card{background:#1a1d2e;border:1px solid #2d3348;border-radius:10px;padding:16px;transition:border-color .2s,transform .2s}
-.card:hover{border-color:#60a5fa;transform:translateY(-2px)}
-.card .title{display:flex;align-items:center;gap:8px;margin-bottom:12px}
-.card .title .indicator{width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0}
-.card .title span{font-weight:600;font-size:14px;color:#ccc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.card .metric{display:flex;justify-content:space-between;align-items:baseline;padding:4px 0}
-.card .metric .label{font-size:12px;color:#666}
-.card .metric .val{font-size:20px;font-weight:700;color:#60a5fa}
-.card .metric .val.purple{color:#a78bfa}
-.empty{color:#555;font-size:14px;padding:20px;text-align:center}
-.footer{text-align:center;padding:20px;color:#444;font-size:12px}
-@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-.card{animation:fadeIn .3s ease}
-</style>
-</head>
-<body>
-<div class="header">
-  <div class="dot" id="statusDot"></div>
-  <h1>GatewayWorker-Go Dashboard</h1>
-  <div class="time" id="updateTime">--:--:--</div>
-</div>
-<div class="stats">
-  <div class="stat-card"><div class="label">在线连接</div><div class="value" id="totalClients">0</div></div>
-  <div class="stat-card"><div class="label">Gateway 数</div><div class="value" id="totalGateways">0</div></div>
-  <div class="stat-card"><div class="label">Worker 数</div><div class="value" id="totalWorkers">0</div></div>
-</div>
-<div class="section"><h2>Gateways</h2><div class="cards" id="gatewayCards"></div></div>
-<div class="section"><h2>Business Workers</h2><div class="cards" id="workerCards"></div></div>
-<div class="footer">GatewayWorker-Go Monitor · Real-time WebSocket</div>
-<script>
-const ws = new WebSocket((location.protocol==='https:'?'wss:':'ws:')+'//'+location.host+'/ws');
-ws.onmessage = (e) => {
-  const d = JSON.parse(e.data);
-  document.getElementById('totalClients').textContent = d.total_clients;
-  document.getElementById('totalGateways').textContent = d.gateways?d.gateways.length:0;
-  document.getElementById('totalWorkers').textContent = d.total_workers;
-  document.getElementById('updateTime').textContent = d.update_time;
-
-  const gc = document.getElementById('gatewayCards');
-  if(!d.gateways||d.gateways.length===0){gc.innerHTML='<div class="empty">暂无 Gateway</div>';}
-  else{gc.innerHTML=d.gateways.map(g=>'<div class="card"><div class="title"><div class="indicator"></div><span>'+g.addr+'</span></div><div class="metric"><span class="label">在线连接</span><span class="val">'+g.client_count+'</span></div></div>').join('');}
-
-  const wc = document.getElementById('workerCards');
-  if(!d.workers||d.workers.length===0){wc.innerHTML='<div class="empty">暂无 Worker</div>';}
-  else{wc.innerHTML=d.workers.map(w=>'<div class="card"><div class="title"><div class="indicator"></div><span>'+(w.name||w.addr)+'</span></div><div class="metric"><span class="label">处理次数</span><span class="val purple">'+w.processed_count.toLocaleString()+'</span></div><div class="metric"><span class="label">地址</span><span class="label">'+w.addr+'</span></div></div>').join('');}
-};
-ws.onclose = () => {document.getElementById('statusDot').style.background='#ef4444';};
-</script>
-</body>
-</html>`
+//go:embed template.html
+var dashboardHTML string
 
 func main() {
 	listen := flag.String("listen", "0.0.0.0:8686", "Dashboard web listen address")

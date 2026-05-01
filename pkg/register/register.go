@@ -165,7 +165,6 @@ func (r *Register) handleConnection(conn net.Conn) {
 				info.ProcessedCount = msg.ProcessedCount
 				r.workerInfos.Store(connID, info)
 			}
-			r.broadcastStatusToAdmins()
 
 		case "admin_connect":
 			if msg.SecretKey != r.SecretKey {
