@@ -1,0 +1,45 @@
+package main
+
+import (
+	"flag"
+	"gatewayworker-go/pkg/register"
+	"log"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+)
+
+// parseRegisterAddr 解析 Register 监听地址
+// 支持格式: "text://0.0.0.0:1236", "tcp://0.0.0.0:1236", "0.0.0.0:1236"
+func parseRegisterAddr(addr string) string {
+	for _, prefix := range []string{"text://", "tcp://"} {
+		if strings.HasPrefix(addr, prefix) {
+			return strings.TrimPrefix(addr, prefix)
+		}
+	}
+	return addr
+}
+
+func main() {
+	listenAddr := flag.String("listen", "text://0.0.0.0:1236", "Register listen address. Format: text://ip:port or tcp://ip:port")
+	secretKey := flag.String("key", "", "Secret key for authentication and AES encryption")
+	flag.Parse()
+
+	addr := parseRegisterAddr(*listenAddr)
+	r := register.New(addr, *secretKey)
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-sigCh
+		log.Println("[Register] Shutting down...")
+		r.Stop()
+		os.Exit(0)
+	}()
+
+	log.Printf("[Register] Starting with addr=%s", addr)
+	if err := r.Run(); err != nil {
+		log.Fatalf("[Register] Fatal: %v", err)
+	}
+}
