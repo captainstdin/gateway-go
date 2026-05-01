@@ -13,9 +13,9 @@ import (
 func main() {
 	listen := flag.String("listen", "websocket://0.0.0.0:7272", "Listen address(es), comma separated. Format: websocket://ip:port or tcp://ip:port or ws://ip:port")
 	lanIP := flag.String("lan-ip", "127.0.0.1", "LAN IP for internal communication")
-	startPort := flag.Int("start-port", 2000, "Internal communication start port")
+	startPort := flag.Int("start-port", 54321, "Internal communication start port")
 	instanceID := flag.Int("id", 0, "Instance ID")
-	registerAddr := flag.String("register", "127.0.0.1:1236", "Register address(es), comma separated")
+	registerAddr := flag.String("register", "127.0.0.1:51234", "Register address(es), comma separated")
 	secretKey := flag.String("key", "", "Secret key")
 	pingInterval := flag.Int("ping-interval", 55, "Ping interval in seconds, 0 to disable")
 	pingLimit := flag.Int("ping-limit", 0, "Ping not response limit")

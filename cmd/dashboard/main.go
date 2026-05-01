@@ -409,7 +409,7 @@ ws.onclose = () => {document.getElementById('statusDot').style.background='#ef44
 
 func main() {
 	listen := flag.String("listen", "0.0.0.0:8686", "Dashboard web listen address")
-	registerAddr := flag.String("register", "127.0.0.1:1236", "Register address(es), comma separated")
+	registerAddr := flag.String("register", "127.0.0.1:51234", "Register address(es), comma separated")
 	secretKey := flag.String("key", "", "Secret key")
 	flag.Parse()
 

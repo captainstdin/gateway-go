@@ -15,7 +15,7 @@ import (
 func main() {
 	name := flag.String("name", "worker", "Worker name")
 	id := flag.Int("id", 0, "Worker ID")
-	registerAddr := flag.String("register", "127.0.0.1:1236", "Register address(es), comma separated")
+	registerAddr := flag.String("register", "127.0.0.1:51234", "Register address(es), comma separated")
 	secretKey := flag.String("key", "", "Secret key")
 	flag.Parse()
 

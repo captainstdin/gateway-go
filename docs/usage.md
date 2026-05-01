@@ -16,16 +16,16 @@ go build -o bin/dashboard ./cmd/dashboard
 
 ```bash
 # 终端1: Register
-./bin/register -listen "text://0.0.0.0:1236" -key "my-secret-key"
+./bin/register -listen "text://0.0.0.0:51234" -key "my-secret-key"
 
 # 终端2: Gateway（WebSocket + TCP 双协议）
-./bin/gateway -listen "websocket://0.0.0.0:7272,tcp://0.0.0.0:7273" -key "my-secret-key" -register "127.0.0.1:1236"
+./bin/gateway -listen "websocket://0.0.0.0:7272,tcp://0.0.0.0:7273" -key "my-secret-key" -register "127.0.0.1:51234"
 
 # 终端3: Worker（内置 echo 示例）
-./bin/worker -key "my-secret-key" -register "127.0.0.1:1236"
+./bin/worker -key "my-secret-key" -register "127.0.0.1:51234"
 
 # 终端4: Dashboard（可选）
-./bin/dashboard -listen "0.0.0.0:8686" -key "my-secret-key" -register "127.0.0.1:1236"
+./bin/dashboard -listen "0.0.0.0:8686" -key "my-secret-key" -register "127.0.0.1:51234"
 ```
 
 ### 测试连接
@@ -76,7 +76,7 @@ ws.onmessage = (e) => console.log('收到:', e.data);
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
-| `-listen` | `text://0.0.0.0:1236` | 监听地址 |
+| `-listen` | `text://0.0.0.0:51234` | 监听地址 |
 | `-key` | `""` | 认证密钥（同时用于 AES 加密） |
 
 ### Gateway
@@ -85,9 +85,9 @@ ws.onmessage = (e) => console.log('收到:', e.data);
 |------|--------|------|
 | `-listen` | `websocket://0.0.0.0:7272` | 监听地址，逗号分隔多个 |
 | `-lan-ip` | `127.0.0.1` | 内网 IP（分布式部署时设为本机内网 IP）|
-| `-start-port` | `2000` | 内部通讯起始端口 |
+| `-start-port` | `54321` | 内部通讯起始端口 |
 | `-id` | `0` | 实例 ID（多实例时需不同）|
-| `-register` | `127.0.0.1:1236` | Register 地址，逗号分隔多个 |
+| `-register` | `127.0.0.1:51234` | Register 地址，逗号分隔多个 |
 | `-key` | `""` | 认证密钥 |
 | `-ping-interval` | `55` | 心跳间隔（秒），0 禁用 |
 | `-ping-limit` | `0` | 心跳未响应上限，0 不检测 |
@@ -99,7 +99,7 @@ ws.onmessage = (e) => console.log('收到:', e.data);
 |------|--------|------|
 | `-name` | `worker` | Worker 名称 |
 | `-id` | `0` | Worker ID |
-| `-register` | `127.0.0.1:1236` | Register 地址，逗号分隔多个 |
+| `-register` | `127.0.0.1:51234` | Register 地址，逗号分隔多个 |
 | `-key` | `""` | 认证密钥 |
 
 ### Dashboard
@@ -107,7 +107,7 @@ ws.onmessage = (e) => console.log('收到:', e.data);
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
 | `-listen` | `0.0.0.0:8686` | Web 监听地址 |
-| `-register` | `127.0.0.1:1236` | Register 地址，逗号分隔多个 |
+| `-register` | `127.0.0.1:51234` | Register 地址，逗号分隔多个 |
 | `-key` | `""` | 认证密钥 |
 
 ---
@@ -129,7 +129,7 @@ import (
 )
 
 func main() {
-    bw := worker.New("chat", 0, []string{"127.0.0.1:1236"}, "my-key")
+    bw := worker.New("chat", 0, []string{"127.0.0.1:51234"}, "my-key")
 
     bw.OnConnect = func(clientID string) {
         log.Printf("新连接: %s", clientID)
@@ -197,7 +197,7 @@ import (
 
 func main() {
     client := gateway_client.New(
-        []string{"127.0.0.1:1236"},
+        []string{"127.0.0.1:51234"},
         "my-secret-key",
     )
     defer client.Close()
@@ -292,7 +292,7 @@ func main() {
 ### 单机部署
 
 ```bash
-./register  -listen "text://0.0.0.0:1236" -key "xxx"
+./register  -listen "text://0.0.0.0:51234" -key "xxx"
 ./gateway   -listen "ws://0.0.0.0:7272" -key "xxx"
 ./worker    -key "xxx"
 ./dashboard -listen "0.0.0.0:8686" -key "xxx"
@@ -302,14 +302,14 @@ func main() {
 
 ```bash
 # 服务器A: Register
-./register -listen "text://0.0.0.0:1236" -key "xxx"
+./register -listen "text://0.0.0.0:51234" -key "xxx"
 
 # 服务器B: Gateway
 ./gateway -listen "ws://0.0.0.0:7272" -lan-ip "192.168.1.2" -key "xxx" \
-    -register "192.168.1.1:1236"
+    -register "192.168.1.1:51234"
 
 # 服务器C: Worker
-./worker -key "xxx" -register "192.168.1.1:1236"
+./worker -key "xxx" -register "192.168.1.1:51234"
 ```
 
 > **注意**：跨机部署时 Gateway 必须设置 `-lan-ip` 为本机内网 IP。
@@ -318,21 +318,21 @@ func main() {
 
 ```bash
 # 两台 Register
-./register -listen "text://0.0.0.0:1236" -key "xxx"   # 服务器A
-./register -listen "text://0.0.0.0:1236" -key "xxx"   # 服务器B
+./register -listen "text://0.0.0.0:51234" -key "xxx"   # 服务器A
+./register -listen "text://0.0.0.0:51234" -key "xxx"   # 服务器B
 
 # Gateway/Worker 填多个 Register（逗号分隔）
 ./gateway -listen "ws://0.0.0.0:7272" -key "xxx" \
-    -register "192.168.1.10:1236,192.168.1.11:1236"
+    -register "192.168.1.10:51234,192.168.1.11:51234"
 
-./worker -key "xxx" -register "192.168.1.10:1236,192.168.1.11:1236"
+./worker -key "xxx" -register "192.168.1.10:51234,192.168.1.11:51234"
 ```
 
 ### 多 Gateway 实例
 
 ```bash
-./gateway -id 0 -listen "ws://0.0.0.0:7272" -key "xxx"   # 内部端口 2000
-./gateway -id 1 -listen "ws://0.0.0.0:7273" -key "xxx"   # 内部端口 2001
+./gateway -id 0 -listen "ws://0.0.0.0:7272" -key "xxx"   # 内部端口 54321
+./gateway -id 1 -listen "ws://0.0.0.0:7273" -key "xxx"   # 内部端口 54322
 ```
 
 ### 多 Worker 实例

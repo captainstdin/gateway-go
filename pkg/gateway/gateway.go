@@ -106,7 +106,7 @@ func New(cfg *Config) *Gateway {
 		g.LanIP = "127.0.0.1"
 	}
 	if g.StartPort == 0 {
-		g.StartPort = 2000
+		g.StartPort = 54321
 		g.LanPort = g.StartPort + g.InstanceID
 	}
 	return g

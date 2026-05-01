@@ -73,7 +73,7 @@ GatewayWorker-Go 采用 **Gateway + Worker 分离** 的架构，将网络 IO 与
 
 - **职责**：维护 Gateway 和 Worker 的地址列表，当 Gateway 上线/下线时通知所有 Worker
 - **协议**：文本协议（JSON + AES加密 + Base64编码 + `\n` 分隔）
-- **监听地址**：支持 URI 格式，如 `text://0.0.0.0:1236`
+- **监听地址**：支持 URI 格式，如 `text://0.0.0.0:51234`
 - **无状态**：不存储业务数据，仅做服务发现和状态中转
 - **高可用**：支持部署**多个 Register 实例**，Gateway/Worker 同时连接所有 Register，任一 Register 存活即可正常工作
 
@@ -92,7 +92,7 @@ GatewayWorker-Go 采用 **Gateway + Worker 分离** 的架构，将网络 IO 与
 **多 Register 高可用原理**：
 
 ```
-Register-A (192.168.1.10:1236)     Register-B (192.168.1.11:1236)
+Register-A (192.168.1.10:51234)     Register-B (192.168.1.11:51234)
      ▲    ▲                              ▲    ▲
      │    └──── Worker ──────────────────┘    │
      │                                        │
