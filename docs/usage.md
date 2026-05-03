@@ -6,10 +6,11 @@
 
 ```bash
 cd Gatewayworker-go
-go build -o bin/register  ./cmd/register
-go build -o bin/gateway   ./cmd/gateway
-go build -o bin/worker    ./cmd/worker
-go build -o bin/dashboard ./cmd/dashboard
+go build -o bin/register     ./cmd/register
+go build -o bin/gateway      ./cmd/gateway
+go build -o bin/worker       ./cmd/worker
+go build -o bin/dashboard    ./cmd/dashboard
+go build -o bin/gateway-edit ./cmd/gateway-edit  # 自定义协议示例
 ```
 
 ### 启动服务
@@ -54,7 +55,10 @@ ws.onmessage = (e) => console.log('收到:', e.data);
 | `tcp://` | 文本协议（同 text://） | Register |
 | `websocket://` | WebSocket 协议 | Gateway |
 | `ws://` | WebSocket 简写 | Gateway |
-| `tcp://` | TCP 4字节长度头协议 | Gateway |
+| `tcp://` | TCP 4字节 body 长度头协议（Go 版默认） | Gateway |
+| `frame://` | TCP 4字节总包长头协议（与 PHP Workerman frame 一致） | Gateway |
+| `text://` | 换行符分隔文本协议（与 PHP Workerman text 一致） | Gateway |
+| `自定义://` | 自定义 TCP 协议（需先注册） | Gateway |
 
 不带前缀时，Register 默认 text，Gateway 默认 websocket。
 
@@ -66,7 +70,151 @@ ws.onmessage = (e) => console.log('收到:', e.data);
 
 # 只开 WebSocket
 ./gateway -listen "ws://0.0.0.0:7272" -key "xxx"
+
+# 使用自定义协议（需在代码中先 RegisterProtocol）
+./gateway -listen "websocket://0.0.0.0:7272,jsonNL://0.0.0.0:7273" -key "xxx"
 ```
+
+---
+
+## 自定义 TCP 协议
+
+Gateway 支持自定义 TCP 应用层协议，参考 PHP Workerman 的 `ProtocolInterface` 设计。
+
+### 协议接口
+
+实现 `ClientProtocol` 接口即可定义自己的协议，接口定义在 `pkg/gateway/client_protocol.go`：
+
+```go
+type ClientProtocol interface {
+    // Input 从 TCP 流缓冲区中判断一个完整包的长度
+    //  返回 > 0: 完整包的总长度，框架会凑齐后调用 Decode
+    //  返回 == 0: 数据不够，继续等待
+    //  返回 < 0: 协议错误，关闭连接
+    Input(buf []byte) int
+
+    // Decode 将完整的原始数据包解码为业务数据
+    Decode(buf []byte) []byte
+
+    // Encode 将业务数据编码为协议格式字节
+    Encode(data []byte) []byte
+}
+```
+
+### 工作流程
+
+```
+客户端发送数据 → TCP 流 → Input(buf) 分包
+                            ↓ 凑齐完整包
+                        Decode(packet) 解包
+                            ↓
+                     OnMessage(clientID, data) 业务回调
+
+业务回调 send(data) → Encode(data) 打包 → 发送给客户端
+```
+
+### 示例：JsonNL 协议
+
+以换行符 `\n` 作为包分隔符，数据格式为 JSON（与 PHP Workerman 的 JsonNL 协议一致）：
+
+```go
+package main
+
+import (
+    "bytes"
+    "gatewayworker-go/pkg/gateway"
+)
+
+// JsonNLProtocol 以 \n 分隔的 JSON 文本协议
+type JsonNLProtocol struct{}
+
+func (p *JsonNLProtocol) Input(buf []byte) int {
+    pos := bytes.IndexByte(buf, '\n')
+    if pos < 0 {
+        return 0 // 没有换行符，继续等待
+    }
+    return pos + 1 // 包含换行符的完整包长度
+}
+
+func (p *JsonNLProtocol) Decode(buf []byte) []byte {
+    return bytes.TrimRight(buf, "\n")
+}
+
+func (p *JsonNLProtocol) Encode(data []byte) []byte {
+    return append(data, '\n')
+}
+```
+
+### 注册和使用
+
+完整的自定义协议示例参见 `cmd/gateway-edit/main.go`。
+
+**编译**：
+
+```bash
+go build -o bin/gateway-edit ./cmd/gateway-edit
+```
+
+**启动**（使用自定义 JsonNL 协议）：
+
+```bash
+# 终端1: Register
+./bin/register -listen "text://0.0.0.0:51234" -key "my-secret-key"
+
+# 终端2: Gateway（使用自定义 jsonNL 协议）
+./bin/gateway-edit -listen "jsonNL://0.0.0.0:7273" -key "my-secret-key" -register "127.0.0.1:51234"
+
+# 或者 WebSocket + 自定义协议双监听
+./bin/gateway-edit -listen "websocket://0.0.0.0:7272,jsonNL://0.0.0.0:7273" -key "my-secret-key" -register "127.0.0.1:51234"
+
+# 或者使用内置 text 协议（无需自定义，标准 gateway 也支持）
+./bin/gateway -listen "text://0.0.0.0:7273" -key "my-secret-key" -register "127.0.0.1:51234"
+
+# 终端3: Worker
+./bin/worker -key "my-secret-key" -register "127.0.0.1:51234"
+```
+
+**客户端测试**（telnet）：
+
+```bash
+telnet 127.0.0.1 7273
+{"type":"chat","msg":"hello"}
+# 回车发送，Worker 会收到 OnMessage 回调
+```
+
+**关键代码**（cmd/gateway-edit/main.go 中的核心步骤）：
+
+```go
+// 1. 实现 ClientProtocol 接口
+type JsonNLProtocol struct{}
+func (p *JsonNLProtocol) Input(buf []byte) int  { /* 找 \n */ }
+func (p *JsonNLProtocol) Decode(buf []byte) []byte { /* 去掉 \n */ }
+func (p *JsonNLProtocol) Encode(data []byte) []byte { /* 加 \n */ }
+
+// 2. 在 main() 中注册
+gateway.RegisterProtocol("jsonNL", &JsonNLProtocol{})
+
+// 3. 通过 -listen "jsonNL://0.0.0.0:7273" 启动
+```
+
+### 内置协议
+
+| 协议名 | 包格式 | 说明 |
+|--------|--------|------|
+| `websocket` | WebSocket 帧 | WebSocket 协议，支持 `websocket://` 和 `ws://` |
+| `tcp` | `[4B body长度][body]` | 4字节大端 **body 长度** + body，Go 版默认 TCP 协议 |
+| `frame` | `[4B 总包长][body]` | 4字节大端 **总包长**(含头) + body，与 PHP Workerman frame 一致 |
+| `text` | `数据\n` | 换行符 `\n` 分隔的文本协议，适合 telnet 调试 |
+
+### 与 PHP Workerman 对比
+
+| PHP | Go | 说明 |
+|-----|-----|------|
+| `ProtocolInterface::input($buffer)` | `ClientProtocol.Input(buf) int` | 分包 |
+| `ProtocolInterface::decode($buffer)` | `ClientProtocol.Decode(buf) []byte` | 解包 |
+| `ProtocolInterface::encode($data)` | `ClientProtocol.Encode(data) []byte` | 打包 |
+| `new Gateway("JsonNL://...")` 自动加载 | `RegisterProtocol("jsonNL", &P{})` 手动注册 | Go 是静态语言 |
+| 协议类放在 `Protocols/` 目录自动发现 | 在 `main()` 或 `init()` 中显式注册 | 编译时确定 |
 
 ---
 

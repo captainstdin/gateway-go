@@ -21,24 +21,42 @@ import (
 
 // listenEntry 解析后的监听地址条目
 type listenEntry struct {
-	Protocol string // "websocket" 或 "tcp"
-	Addr     string // "0.0.0.0:7272"
+	Protocol      string         // "websocket" 或自定义协议名
+	Addr          string         // "0.0.0.0:7272"
+	ClientProto   ClientProtocol // TCP 类协议的实现（websocket 时为 nil）
 }
 
-// parseListenAddr 解析 PHP 风格的监听地址
-// 支持格式: "websocket://0.0.0.0:7272", "tcp://0.0.0.0:7273", "ws://0.0.0.0:7272"
-// 不带协议前缀默认为 websocket
+// parseListenAddr 解析监听地址
+// 支持格式:
+//   - "websocket://0.0.0.0:7272", "ws://0.0.0.0:7272" — WebSocket
+//   - "tcp://0.0.0.0:7273" — 默认 4 字节长度头 TCP 协议
+//   - "frame://0.0.0.0:7273" — 同 tcp
+//   - "jsonNL://0.0.0.0:7273" — 自定义协议（需先 RegisterProtocol 注册）
+//   - 不带前缀默认为 websocket
 func parseListenAddr(addr string) listenEntry {
-	if strings.HasPrefix(addr, "websocket://") {
-		return listenEntry{Protocol: "websocket", Addr: strings.TrimPrefix(addr, "websocket://")}
+	// 检查是否有 "://" 分隔符
+	if idx := strings.Index(addr, "://"); idx > 0 {
+		scheme := addr[:idx]
+		hostPort := addr[idx+3:]
+		schemeLower := strings.ToLower(scheme)
+
+		// WebSocket 系列
+		if schemeLower == "websocket" || schemeLower == "ws" {
+			return listenEntry{Protocol: "websocket", Addr: hostPort}
+		}
+
+		// 从注册表查找 TCP 类协议
+		if proto, ok := getProtocol(schemeLower); ok {
+			return listenEntry{Protocol: scheme, Addr: hostPort, ClientProto: proto}
+		}
+
+		// 未注册的协议名，回退到默认 TCP（4字节长度头）
+		log.Printf("[Gateway] Unknown protocol %q, falling back to tcp", scheme)
+		defaultProto, _ := getProtocol("tcp")
+		return listenEntry{Protocol: scheme, Addr: hostPort, ClientProto: defaultProto}
 	}
-	if strings.HasPrefix(addr, "ws://") {
-		return listenEntry{Protocol: "websocket", Addr: strings.TrimPrefix(addr, "ws://")}
-	}
-	if strings.HasPrefix(addr, "tcp://") {
-		return listenEntry{Protocol: "tcp", Addr: strings.TrimPrefix(addr, "tcp://")}
-	}
-	// 默认 websocket
+
+	// 不带前缀默认 websocket
 	return listenEntry{Protocol: "websocket", Addr: addr}
 }
 
@@ -54,7 +72,7 @@ type ClientConnection struct {
 }
 
 type Gateway struct {
-	ListenAddrs  []string // 支持: "websocket://0.0.0.0:7272", "tcp://0.0.0.0:7273"
+	ListenAddrs  []string // 支持: "websocket://0.0.0.0:7272", "tcp://0.0.0.0:7273", "自定义协议://..."
 	LanIP        string
 	LanPort      int
 	StartPort    int
@@ -113,7 +131,7 @@ func New(cfg *Config) *Gateway {
 }
 
 type Config struct {
-	ListenAddrs          []string // 如 ["websocket://0.0.0.0:7272", "tcp://0.0.0.0:7273"]
+	ListenAddrs          []string // 如 ["websocket://0.0.0.0:7272", "tcp://0.0.0.0:7273", "jsonNL://0.0.0.0:7274"]
 	LanIP                string
 	StartPort            int
 	InstanceID           int
@@ -142,19 +160,15 @@ func (g *Gateway) Run() error {
 		go g.pingLoop()
 	}
 
+	// Gateway→Worker 心跳，固定 25s，独立于客户端心跳
+	go g.pingWorkerLoop()
+
 	// 解析并启动所有对外监听地址
 	for _, raw := range g.ListenAddrs {
 		entry := parseListenAddr(raw)
-		switch entry.Protocol {
-		case "tcp":
-			tcpLn, err := net.Listen("tcp", entry.Addr)
-			if err != nil {
-				return fmt.Errorf("tcp listen on %s failed: %w", entry.Addr, err)
-			}
-			log.Printf("[Gateway] TCP listening on tcp://%s", entry.Addr)
-			go g.acceptTCPClients(tcpLn)
 
-		case "websocket":
+		if entry.Protocol == "websocket" {
+			// WebSocket 监听
 			log.Printf("[Gateway] WebSocket listening on websocket://%s", entry.Addr)
 			mux := http.NewServeMux()
 			mux.HandleFunc("/", g.handleWebSocket)
@@ -164,8 +178,15 @@ func (g *Gateway) Run() error {
 					log.Printf("[Gateway] WebSocket server error: %v", err)
 				}
 			}(server)
-
-		default:
+		} else if entry.ClientProto != nil {
+			// TCP 类协议监听（内置 tcp/frame 或自定义协议）
+			tcpLn, err := net.Listen("tcp", entry.Addr)
+			if err != nil {
+				return fmt.Errorf("%s listen on %s failed: %w", entry.Protocol, entry.Addr, err)
+			}
+			log.Printf("[Gateway] TCP(%s) listening on %s://%s", entry.Protocol, entry.Protocol, entry.Addr)
+			go g.acceptTCPClients(tcpLn, entry.ClientProto)
+		} else {
 			log.Printf("[Gateway] Unknown protocol: %s in %s", entry.Protocol, raw)
 		}
 	}
@@ -202,7 +223,7 @@ func (g *Gateway) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	g.onClientClose(clientConn)
 }
 
-func (g *Gateway) acceptTCPClients(ln net.Listener) {
+func (g *Gateway) acceptTCPClients(ln net.Listener, proto ClientProtocol) {
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
@@ -214,7 +235,7 @@ func (g *Gateway) acceptTCPClients(ln net.Listener) {
 			}
 		}
 		go func(c net.Conn) {
-			cc := NewTCPClientConn(c)
+			cc := NewTCPClientConn(c, proto)
 			clientConn := g.onClientConnect(cc)
 			g.sendToWorker(protocol.CmdOnConnect, clientConn, nil)
 			for {
@@ -519,15 +540,27 @@ func (g *Gateway) ping() {
 			conn.Conn.Write([]byte(g.PingData))
 		}
 	}
+}
 
-	// Ping workers
-	g.mu.RLock()
-	for _, wconn := range g.workerConns {
-		gd := protocol.NewEmptyData()
-		gd.Cmd = protocol.CmdPing
-		g.sendEncrypted(wconn, protocol.Encode(gd))
+// pingWorkerLoop 独立的 Gateway→Worker 心跳循环，固定 25 秒间隔
+// 与客户端心跳 (PingInterval) 完全解耦，确保跨机部署时连接不被中间设备超时断开
+func (g *Gateway) pingWorkerLoop() {
+	ticker := time.NewTicker(25 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-g.stopCh:
+			return
+		case <-ticker.C:
+			g.mu.RLock()
+			for _, wconn := range g.workerConns {
+				gd := protocol.NewEmptyData()
+				gd.Cmd = protocol.CmdPing
+				g.sendEncrypted(wconn, protocol.Encode(gd))
+			}
+			g.mu.RUnlock()
+		}
 	}
-	g.mu.RUnlock()
 }
 
 func ipToUint32(ip string) uint32 {
