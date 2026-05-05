@@ -291,7 +291,6 @@ func (g *Gateway) onClientConnect(cc ClientConn) *ClientConnection {
 	g.mu.Lock()
 	g.clientConns[connID] = conn
 	g.mu.Unlock()
-	log.Printf("[Gateway] Client connected: %s connID=%d", cc.RemoteAddr(), connID)
 	return conn
 }
 
@@ -325,7 +324,6 @@ func (g *Gateway) onClientClose(conn *ClientConnection) {
 	}
 	g.mu.Unlock()
 	conn.Conn.Close()
-	log.Printf("[Gateway] Client disconnected: connID=%d", conn.ID)
 }
 
 func (g *Gateway) sendToWorker(cmd uint8, conn *ClientConnection, body []byte) bool {

@@ -33,13 +33,12 @@ func main() {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-sigCh
-		log.Println("[Register] Shutting down...")
+		log.Println("? [Register] Shutting down...")
 		r.Stop()
 		os.Exit(0)
 	}()
 
-	log.Printf("[Register] Starting with addr=%s", addr)
 	if err := r.Run(); err != nil {
-		log.Fatalf("[Register] Fatal: %v", err)
+		log.Fatalf("x [Register] Fatal: %v", err)
 	}
 }

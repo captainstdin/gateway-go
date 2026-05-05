@@ -23,21 +23,20 @@ func main() {
 
 	// Set business callbacks
 	bw.OnWorkerStart = func() {
-		log.Println("[Worker] Started")
+		log.Println("√ [Worker] Started")
 	}
 	bw.OnConnect = func(clientID string) {
-		log.Printf("[Worker] Client connected: %s", clientID)
+		log.Printf("√ [Worker] Client connected: %s", clientID)
 	}
 	bw.OnMessage = func(clientID string, message []byte) {
-		log.Printf("[Worker] Message from %s: %s", clientID, string(message))
-		// Echo back
-		gateway_api.SendToClient(clientID, []byte(fmt.Sprintf("echo: %s", string(message))))
+		gateway_api.SendToAll([]byte(fmt.Sprintf("%s:%s", clientID, string(message))), nil, nil)
 	}
 	bw.OnClose = func(clientID string) {
-		log.Printf("[Worker] Client disconnected: %s", clientID)
+		log.Printf("? [Worker] Client disconnected: %s", clientID)
 	}
 	bw.OnWebSocketConnect = func(clientID string, data []byte) {
-		log.Printf("[Worker] WebSocket connected: %s", clientID)
+		log.Printf("√ [Worker] WebSocket connected: %s", clientID)
+		gateway_api.SendToClient(clientID, []byte("Welcome! Your ID are: "+clientID))
 	}
 
 	gateway_api.SetBusinessWorker(bw)
@@ -46,12 +45,12 @@ func main() {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-sigCh
-		log.Println("[Worker] Shutting down...")
+		log.Println("? [Worker] Shutting down...")
 		bw.Stop()
 		os.Exit(0)
 	}()
 
 	if err := bw.Run(); err != nil {
-		log.Fatalf("[Worker] Fatal: %v", err)
+		log.Fatalf("x [Worker] Fatal: %v", err)
 	}
 }

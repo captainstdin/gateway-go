@@ -38,12 +38,12 @@ func main() {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-sigCh
-		log.Println("[Gateway] Shutting down...")
+		log.Println("? [Gateway] Shutting down...")
 		g.Stop()
 		os.Exit(0)
 	}()
 
 	if err := g.Run(); err != nil {
-		log.Fatalf("[Gateway] Fatal: %v", err)
+		log.Fatalf("x [Gateway] Fatal: %v", err)
 	}
 }

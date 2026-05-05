@@ -116,8 +116,6 @@ func (bw *BusinessWorker) maintainRegisterConn(regAddr string) {
 			time.Sleep(time.Second)
 			continue
 		}
-		log.Printf("[Worker] Connected to register %s", regAddr)
-
 		msg, _ := json.Marshal(map[string]string{
 			"event": "worker_connect", "secret_key": bw.SecretKey, "name": bw.WorkerName(),
 		})
@@ -233,8 +231,6 @@ func (bw *BusinessWorker) connectToGateway(addr string) {
 	bw.mu.Lock()
 	bw.gatewayConns[addr] = conn
 	bw.mu.Unlock()
-	log.Printf("[Worker] Connected to gateway %s", addr)
-
 	// Read loop
 	for {
 		plaintext, err := bw.readEncryptedPacket(conn)

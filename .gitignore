@@ -31,3 +31,11 @@ __debug_bin*
 
 # Vendor (optional, uncomment if vendoring)
 # vendor/
+
+cmd/gateway/gateway
+cmd/register/register
+cmd/worker/worker
+cmd/dashboard/dashboard
+cmd/gateway-edit/gateway-edit
+cmd/test-ws-tui/test-ws-tui
+cmd/tui-ws-chat/tui-ws-chat
