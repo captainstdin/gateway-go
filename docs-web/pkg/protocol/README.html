@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>README.md - GatewayWorker-Go 文档</title>
+    <link rel="stylesheet" href="../../github-markdown.css">
+    <link rel="stylesheet" href="../../chroma.css">
+    <style>
+        body {
+            display: flex;
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+            background-color: #fff;
+            color: #24292f;
+        }
+        .sidebar {
+            width: 280px;
+            height: 100vh;
+            overflow-y: auto;
+            background: #f6f8fa;
+            border-right: 1px solid #d0d7de;
+            padding: 20px;
+            position: fixed;
+            box-sizing: border-box;
+        }
+        .sidebar h3 {
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+            font-size: 14px;
+            color: #57606a;
+            text-transform: uppercase;
+        }
+        .sidebar h3:first-child { margin-top: 0; }
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .sidebar li {
+            margin-bottom: 6px;
+        }
+        .sidebar a {
+            text-decoration: none;
+            color: #0969da;
+            font-size: 14px;
+            display: block;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        .sidebar a:hover {
+            background-color: #eaf0f6;
+            text-decoration: underline;
+        }
+        .content {
+            margin-left: 280px;
+            padding: 40px;
+            max-width: 900px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .markdown-body {
+            box-sizing: border-box;
+            min-width: 200px;
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 45px;
+        }
+        @media (max-width: 767px) {
+            .markdown-body { padding: 15px; }
+            body { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; position: relative; border-right: none; border-bottom: 1px solid #d0d7de; }
+            .content { margin-left: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h3>主目录</h3><ul></ul><h3>使用文档 (docs)</h3><ul><li><a href="../../docs/cheatsheet.html">cheatsheet.md</a></li><li><a href="../../docs/README.html">README.md</a></li><li><a href="../../docs/architecture.html">architecture.md</a></li><li><a href="../../docs/usage.html">usage.md</a></li><li><a href="../../docs/best-practices.html">best-practices.md</a></li><li><a href="../../docs/code-usage.html">code-usage.md</a></li><li><a href="../../docs/gateway-sdk.html">gateway-sdk.md</a></li><li><a href="../../docs/internals.html">internals.md</a></li><li><a href="../../docs/optimize2ai.html">optimize2ai.md</a></li><li><a href="../../docs/php-vs-go.html">php-vs-go.md</a></li></ul><h3>包文档 (pkg)</h3><ul><li><a href="../../pkg/context/README.html">pkg/context</a></li><li><a href="../../pkg/crypto/README.html">pkg/crypto</a></li><li><a href="../../pkg/gateway/README.html">pkg/gateway</a></li><li><a href="../../pkg/gateway_api/README.html">pkg/gateway_api</a></li><li><a href="../../pkg/gateway_sdk/README.html">pkg/gateway_sdk</a></li><li><a href="../../pkg/protocol/README.html">pkg/protocol</a></li><li><a href="../../pkg/register/README.html">pkg/register</a></li><li><a href="../../pkg/worker/README.html">pkg/worker</a></li></ul>
+    </div>
+    <div class="content markdown-body">
+        <h1 id="protocol-">protocol 包</h1>
+<h2 id="heading">功能</h2>
+<p>定义 Gateway 与 Worker 之间的 <strong>二进制通讯协议</strong>，包括数据结构、命令字常量、编解码函数。</p>
+<h2 id="heading-1">协议格式</h2>
+<h3 id="28---">包结构（28 字节头 + 变长数据）</h3>
+<pre><code> 0                   4     5              9    11             15   17             21  22    24             28
+ ├───────────────────┼─────┼──────────────┼────┼──────────────┼────┼──────────────┼───┼─────┼──────────────┤
+ │    pack_len(4B)   │cmd  │ local_ip(4B) │port│ client_ip(4B)│port│conn_id(4B)   │flg│gw_pt│ ext_len(4B)  │
+ │    uint32 BE      │1B   │ uint32 BE    │2B  │ uint32 BE    │2B  │uint32 BE     │1B │2B BE│ uint32 BE    │
+ ├───────────────────┴─────┴──────────────┴────┴──────────────┴────┴──────────────┴───┴─────┴──────────────┤
+ │                                      ext_data (变长)                                                    │
+ ├─────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+ │                                      body (变长)                                                        │
+ └─────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<ul>
+<li><strong>pack_len</strong>: 整包长度（含头部），大端序</li>
+<li><strong>cmd</strong>: 命令字，标识消息类型</li>
+<li><strong>local_ip/local_port</strong>: Gateway 内网地址（用于生成 client_id）</li>
+<li><strong>client_ip/client_port</strong>: 客户端真实地址</li>
+<li><strong>connection_id</strong>: 连接 ID</li>
+<li><strong>flag</strong>: 标志位（是否跳过协议 encode 等）</li>
+<li><strong>ext_len + ext_data</strong>: 扩展数据（session、JSON 参数等）</li>
+<li><strong>body</strong>: 消息体</li>
+</ul>
+<h3 id="heading-2">粘包处理</h3>
+<p>使用 <code>Input()</code> 函数从 TCP 流前 4 字节读取 <code>pack_len</code>，确保接收完整包后再解码。</p>
+<h2 id="heading-3">命令字常量</h2>
+<h3 id="gateway--worker">Gateway → Worker（事件通知）</h3>
+<table>
+<thead>
+<tr>
+<th>常量</th>
+<th>值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CmdOnConnect</code></td>
+<td>1</td>
+<td>新客户端连接</td>
+</tr>
+<tr>
+<td><code>CmdOnMessage</code></td>
+<td>3</td>
+<td>客户端消息</td>
+</tr>
+<tr>
+<td><code>CmdOnClose</code></td>
+<td>4</td>
+<td>客户端断开</td>
+</tr>
+<tr>
+<td><code>CmdOnWebSocketConnect</code></td>
+<td>205</td>
+<td>WebSocket 握手完成</td>
+</tr>
+</tbody>
+</table>
+<h3 id="worker--gateway">Worker → Gateway（指令）</h3>
+<table>
+<thead>
+<tr>
+<th>常量</th>
+<th>值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CmdSendToOne</code></td>
+<td>5</td>
+<td>发送给单个客户端</td>
+</tr>
+<tr>
+<td><code>CmdSendToAll</code></td>
+<td>6</td>
+<td>广播</td>
+</tr>
+<tr>
+<td><code>CmdKick</code></td>
+<td>7</td>
+<td>踢出客户端</td>
+</tr>
+<tr>
+<td><code>CmdDestroy</code></td>
+<td>8</td>
+<td>直接销毁连接</td>
+</tr>
+<tr>
+<td><code>CmdBindUID</code></td>
+<td>12</td>
+<td>绑定 UID</td>
+</tr>
+<tr>
+<td><code>CmdUnbindUID</code></td>
+<td>13</td>
+<td>解绑 UID</td>
+</tr>
+<tr>
+<td><code>CmdSendToUID</code></td>
+<td>14</td>
+<td>向 UID 发送</td>
+</tr>
+<tr>
+<td><code>CmdJoinGroup</code></td>
+<td>20</td>
+<td>加入分组</td>
+</tr>
+<tr>
+<td><code>CmdLeaveGroup</code></td>
+<td>21</td>
+<td>离开分组</td>
+</tr>
+<tr>
+<td><code>CmdSendToGroup</code></td>
+<td>22</td>
+<td>向分组发送</td>
+</tr>
+<tr>
+<td><code>CmdUngroup</code></td>
+<td>27</td>
+<td>解散分组</td>
+</tr>
+<tr>
+<td><code>CmdSelect</code></td>
+<td>25</td>
+<td>条件查询</td>
+</tr>
+</tbody>
+</table>
+<h3 id="heading-4">查询类命令</h3>
+<table>
+<thead>
+<tr>
+<th>常量</th>
+<th>值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CmdIsOnline</code></td>
+<td>11</td>
+<td>判断是否在线</td>
+</tr>
+<tr>
+<td><code>CmdGetAllClientSessions</code></td>
+<td>10</td>
+<td>获取所有 session</td>
+</tr>
+<tr>
+<td><code>CmdGetClientCountByGroup</code></td>
+<td>24</td>
+<td>获取组在线数</td>
+</tr>
+<tr>
+<td><code>CmdGetClientIDByUID</code></td>
+<td>15</td>
+<td>获取 UID 绑定的连接</td>
+</tr>
+<tr>
+<td><code>CmdGetGroupIDList</code></td>
+<td>26</td>
+<td>获取在线组列表</td>
+</tr>
+<tr>
+<td><code>CmdGetSessionByClientID</code></td>
+<td>203</td>
+<td>获取指定连接 session</td>
+</tr>
+</tbody>
+</table>
+<h2 id="heading-5">导出函数</h2>
+<table>
+<thead>
+<tr>
+<th>函数</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>NewEmptyData()</code></td>
+<td>创建空的 GatewayData</td>
+</tr>
+<tr>
+<td><code>Encode(data)</code></td>
+<td>GatewayData → 二进制</td>
+</tr>
+<tr>
+<td><code>Decode(buf)</code></td>
+<td>二进制 → GatewayData</td>
+</tr>
+<tr>
+<td><code>Input(buf)</code></td>
+<td>TCP 粘包处理，返回包长度</td>
+</tr>
+</tbody>
+</table>
+
+    </div>
+</body>
+</html>

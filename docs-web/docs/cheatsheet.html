@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>cheatsheet.md - GatewayWorker-Go 文档</title>
+    <link rel="stylesheet" href="../github-markdown.css">
+    <link rel="stylesheet" href="../chroma.css">
+    <style>
+        body {
+            display: flex;
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+            background-color: #fff;
+            color: #24292f;
+        }
+        .sidebar {
+            width: 280px;
+            height: 100vh;
+            overflow-y: auto;
+            background: #f6f8fa;
+            border-right: 1px solid #d0d7de;
+            padding: 20px;
+            position: fixed;
+            box-sizing: border-box;
+        }
+        .sidebar h3 {
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+            font-size: 14px;
+            color: #57606a;
+            text-transform: uppercase;
+        }
+        .sidebar h3:first-child { margin-top: 0; }
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .sidebar li {
+            margin-bottom: 6px;
+        }
+        .sidebar a {
+            text-decoration: none;
+            color: #0969da;
+            font-size: 14px;
+            display: block;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        .sidebar a:hover {
+            background-color: #eaf0f6;
+            text-decoration: underline;
+        }
+        .content {
+            margin-left: 280px;
+            padding: 40px;
+            max-width: 900px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .markdown-body {
+            box-sizing: border-box;
+            min-width: 200px;
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 45px;
+        }
+        @media (max-width: 767px) {
+            .markdown-body { padding: 15px; }
+            body { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; position: relative; border-right: none; border-bottom: 1px solid #d0d7de; }
+            .content { margin-left: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h3>主目录</h3><ul></ul><h3>使用文档 (docs)</h3><ul><li><a href="../docs/cheatsheet.html">cheatsheet.md</a></li><li><a href="../docs/README.html">README.md</a></li><li><a href="../docs/architecture.html">architecture.md</a></li><li><a href="../docs/usage.html">usage.md</a></li><li><a href="../docs/best-practices.html">best-practices.md</a></li><li><a href="../docs/code-usage.html">code-usage.md</a></li><li><a href="../docs/gateway-sdk.html">gateway-sdk.md</a></li><li><a href="../docs/internals.html">internals.md</a></li><li><a href="../docs/optimize2ai.html">optimize2ai.md</a></li><li><a href="../docs/php-vs-go.html">php-vs-go.md</a></li></ul><h3>包文档 (pkg)</h3><ul><li><a href="../pkg/context/README.html">pkg/context</a></li><li><a href="../pkg/crypto/README.html">pkg/crypto</a></li><li><a href="../pkg/gateway/README.html">pkg/gateway</a></li><li><a href="../pkg/gateway_api/README.html">pkg/gateway_api</a></li><li><a href="../pkg/gateway_sdk/README.html">pkg/gateway_sdk</a></li><li><a href="../pkg/protocol/README.html">pkg/protocol</a></li><li><a href="../pkg/register/README.html">pkg/register</a></li><li><a href="../pkg/worker/README.html">pkg/worker</a></li></ul>
+    </div>
+    <div class="content markdown-body">
+        <h1 id="heading">速查手册</h1>
+<blockquote>
+<p>30 秒理解整个系统。详细内容点击链接跳转。</p>
+</blockquote>
+<hr>
+<h2 id="heading-1">系统一句话</h2>
+<p><strong>Gateway 管连接，Worker 跑业务，Register 做发现，GatewaySDK 做外推。</strong></p>
+<pre><code>客户端 ←WebSocket/TCP→ Gateway ←AES加密→ Worker（你的业务代码）
+                          ↑                    ↑
+                       Register ←──────────────┘
+                          ↑
+                      GatewaySDK（HTTP服务/定时任务等外部进程）
+</code></pre>
+<hr>
+<h2 id="heading-2">你想做什么？</h2>
+<table>
+<thead>
+<tr>
+<th>我想...</th>
+<th>看这里</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>跑起来试试</td>
+<td><a href="usage.html">usage.md</a> → 快速开始</td>
+</tr>
+<tr>
+<td>写业务逻辑</td>
+<td><a href="code-usage.html">code-usage.md</a> → 修改 <code>cmd/worker/main.go</code></td>
+</tr>
+<tr>
+<td>从 HTTP 服务推送消息</td>
+<td><a href="gateway-sdk.html">gateway-sdk.md</a> → <code>gateway_sdk.New()</code></td>
+</tr>
+<tr>
+<td>了解架构原理</td>
+<td><a href="architecture.html">architecture.md</a></td>
+</tr>
+<tr>
+<td>修改框架内核</td>
+<td>⚠️ 先读 <a href="internals.html">internals.md</a>（锁、连接池、死锁陷阱）</td>
+</tr>
+<tr>
+<td>知道哪些坑已经踩过</td>
+<td><a href="optimize2ai.html">optimize2ai.md</a>（20 个已修复问题）</td>
+</tr>
+<tr>
+<td>从 PHP 迁移</td>
+<td><a href="php-vs-go.html">php-vs-go.md</a></td>
+</tr>
+<tr>
+<td>避免常见错误</td>
+<td><a href="best-practices.html">best-practices.md</a></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="heading-3">核心文件速查</h2>
+<pre><code>写业务:     cmd/worker/main.go          ← 改这个文件
+内部API:    pkg/gateway_api/            ← Worker 回调中用
+外部SDK:    pkg/gateway_sdk/            ← 外部进程推送用
+协议常量:   pkg/protocol/               ← 命令字、包限制
+网关核心:   pkg/gateway/                ← 连接管理（⚠️ 改前读 internals.md）
+</code></pre>
+<hr>
+<h2 id="heading-4">三条铁律</h2>
+<ol>
+<li><strong>回调里不要阻塞</strong> → 耗时操作用 <code>go func(){}()</code> 异步</li>
+<li><strong>Session 要小</strong> → 每条消息都带着传输，放大量数据会拖垮性能</li>
+<li><strong>改锁相关代码前读 internals.md 第三章</strong> → 已经修过 3 次&quot;持锁做网络 I/O&quot;的 bug</li>
+</ol>
+<hr>
+<h2 id="heading-5">启动命令</h2>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="c1"># 一键编译</span>
+</span></span><span class="line"><span class="cl">bash cmd/build_all.sh
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># 一键启动（register + gateway + worker）</span>
+</span></span><span class="line"><span class="cl">bash cmd/start.sh
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># 测试连接</span>
+</span></span><span class="line"><span class="cl"><span class="c1"># 浏览器: new WebSocket(&#39;ws://127.0.0.1:7272&#39;)</span>
+</span></span></code></pre>
+    </div>
+</body>
+</html>

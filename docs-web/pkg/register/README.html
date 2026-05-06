@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>README.md - GatewayWorker-Go 文档</title>
+    <link rel="stylesheet" href="../../github-markdown.css">
+    <link rel="stylesheet" href="../../chroma.css">
+    <style>
+        body {
+            display: flex;
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+            background-color: #fff;
+            color: #24292f;
+        }
+        .sidebar {
+            width: 280px;
+            height: 100vh;
+            overflow-y: auto;
+            background: #f6f8fa;
+            border-right: 1px solid #d0d7de;
+            padding: 20px;
+            position: fixed;
+            box-sizing: border-box;
+        }
+        .sidebar h3 {
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+            font-size: 14px;
+            color: #57606a;
+            text-transform: uppercase;
+        }
+        .sidebar h3:first-child { margin-top: 0; }
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .sidebar li {
+            margin-bottom: 6px;
+        }
+        .sidebar a {
+            text-decoration: none;
+            color: #0969da;
+            font-size: 14px;
+            display: block;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        .sidebar a:hover {
+            background-color: #eaf0f6;
+            text-decoration: underline;
+        }
+        .content {
+            margin-left: 280px;
+            padding: 40px;
+            max-width: 900px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .markdown-body {
+            box-sizing: border-box;
+            min-width: 200px;
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 45px;
+        }
+        @media (max-width: 767px) {
+            .markdown-body { padding: 15px; }
+            body { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; position: relative; border-right: none; border-bottom: 1px solid #d0d7de; }
+            .content { margin-left: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h3>主目录</h3><ul></ul><h3>使用文档 (docs)</h3><ul><li><a href="../../docs/cheatsheet.html">cheatsheet.md</a></li><li><a href="../../docs/README.html">README.md</a></li><li><a href="../../docs/architecture.html">architecture.md</a></li><li><a href="../../docs/usage.html">usage.md</a></li><li><a href="../../docs/best-practices.html">best-practices.md</a></li><li><a href="../../docs/code-usage.html">code-usage.md</a></li><li><a href="../../docs/gateway-sdk.html">gateway-sdk.md</a></li><li><a href="../../docs/internals.html">internals.md</a></li><li><a href="../../docs/optimize2ai.html">optimize2ai.md</a></li><li><a href="../../docs/php-vs-go.html">php-vs-go.md</a></li></ul><h3>包文档 (pkg)</h3><ul><li><a href="../../pkg/context/README.html">pkg/context</a></li><li><a href="../../pkg/crypto/README.html">pkg/crypto</a></li><li><a href="../../pkg/gateway/README.html">pkg/gateway</a></li><li><a href="../../pkg/gateway_api/README.html">pkg/gateway_api</a></li><li><a href="../../pkg/gateway_sdk/README.html">pkg/gateway_sdk</a></li><li><a href="../../pkg/protocol/README.html">pkg/protocol</a></li><li><a href="../../pkg/register/README.html">pkg/register</a></li><li><a href="../../pkg/worker/README.html">pkg/worker</a></li></ul>
+    </div>
+    <div class="content markdown-body">
+        <h1 id="register-">register 包</h1>
+<h2 id="heading">功能</h2>
+<p>实现 GatewayWorker 架构的 <strong>注册中心</strong>，负责服务发现和组件协调。</p>
+<h2 id="heading-1">原理</h2>
+<p>Register 是整个架构的中枢，维护 Gateway 和 Worker 的注册信息，实现自动服务发现。</p>
+<h3 id="heading-2">架构位置</h3>
+<pre><code>          ┌──────────┐
+          │ Register │  ← 注册中心
+          └────┬─────┘
+        ┌──────┴──────┐
+        ↕             ↕
+  ┌──────────┐  ┌──────────┐
+  │ Gateway  │  │  Worker  │
+  │ (连接前端)│←→│ (业务逻辑)│
+  └──────────┘  └──────────┘
+</code></pre>
+<h3 id="heading-3">工作流程</h3>
+<ol>
+<li><strong>Gateway 启动</strong> → 连接 Register，上报内部通讯地址</li>
+<li><strong>Worker 启动</strong> → 连接 Register，获取所有 Gateway 地址</li>
+<li><strong>Register 广播</strong> → 当 Gateway 上下线时，通知所有 Worker 更新连接</li>
+<li><strong>Admin 监控</strong> → Dashboard 连接 Register，实时获取集群状态</li>
+</ol>
+<h3 id="heading-4">通讯协议</h3>
+<p>使用 <strong>文本行协议</strong>（每行一个 Base64 加密的 JSON 消息），通过 <code>\n</code> 分隔：</p>
+<pre><code>加密消息格式: Base64(AES-256-CBC(JSON)) + &quot;\n&quot;
+</code></pre>
+<h3 id="heading-5">消息事件</h3>
+<table>
+<thead>
+<tr>
+<th>事件</th>
+<th>方向</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gateway_connect</code></td>
+<td>Gateway → Register</td>
+<td>Gateway 注册，携带内部通讯地址</td>
+</tr>
+<tr>
+<td><code>worker_connect</code></td>
+<td>Worker → Register</td>
+<td>Worker 注册</td>
+</tr>
+<tr>
+<td><code>worker_stats</code></td>
+<td>Worker → Register</td>
+<td>Worker 上报处理计数</td>
+</tr>
+<tr>
+<td><code>admin_connect</code></td>
+<td>Admin → Register</td>
+<td>Dashboard 连接</td>
+</tr>
+<tr>
+<td><code>broadcast_addresses</code></td>
+<td>Register → Worker</td>
+<td>广播所有 Gateway 地址</td>
+</tr>
+<tr>
+<td><code>status_update</code></td>
+<td>Register → Admin</td>
+<td>推送集群状态</td>
+</tr>
+<tr>
+<td><code>ping</code></td>
+<td>任意 → Register</td>
+<td>心跳保活</td>
+</tr>
+</tbody>
+</table>
+<h2 id="heading-6">安全机制</h2>
+<ul>
+<li>所有消息均 AES-256-CBC 加密传输</li>
+<li>连接后 10 秒内必须完成认证（<code>SecretKey</code> 校验），否则断开</li>
+<li>Gateway/Worker/Admin 三种角色分别管理</li>
+</ul>
+<h2 id="heading-7">核心结构</h2>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="kd">type</span><span class="w"> </span><span class="nx">Register</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">ListenAddr</span><span class="w">          </span><span class="kt">string</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">SecretKey</span><span class="w">           </span><span class="kt">string</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">gatewayConnections</span><span class="w">  </span><span class="nx">sync</span><span class="p">.</span><span class="nx">Map</span><span class="w">  </span><span class="c1">// Gateway 内部地址</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">workerConnections</span><span class="w">   </span><span class="nx">sync</span><span class="p">.</span><span class="nx">Map</span><span class="w">  </span><span class="c1">// Worker 连接</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">adminConnections</span><span class="w">    </span><span class="nx">sync</span><span class="p">.</span><span class="nx">Map</span><span class="w">  </span><span class="c1">// Dashboard 连接</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">workerInfos</span><span class="w">         </span><span class="nx">sync</span><span class="p">.</span><span class="nx">Map</span><span class="w">  </span><span class="c1">// Worker 统计信息</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="p">}</span><span class="w">
+</span></span></span></code></pre>
+    </div>
+</body>
+</html>

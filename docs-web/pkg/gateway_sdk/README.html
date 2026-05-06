@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>README.md - GatewayWorker-Go 文档</title>
+    <link rel="stylesheet" href="../../github-markdown.css">
+    <link rel="stylesheet" href="../../chroma.css">
+    <style>
+        body {
+            display: flex;
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+            background-color: #fff;
+            color: #24292f;
+        }
+        .sidebar {
+            width: 280px;
+            height: 100vh;
+            overflow-y: auto;
+            background: #f6f8fa;
+            border-right: 1px solid #d0d7de;
+            padding: 20px;
+            position: fixed;
+            box-sizing: border-box;
+        }
+        .sidebar h3 {
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+            font-size: 14px;
+            color: #57606a;
+            text-transform: uppercase;
+        }
+        .sidebar h3:first-child { margin-top: 0; }
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .sidebar li {
+            margin-bottom: 6px;
+        }
+        .sidebar a {
+            text-decoration: none;
+            color: #0969da;
+            font-size: 14px;
+            display: block;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        .sidebar a:hover {
+            background-color: #eaf0f6;
+            text-decoration: underline;
+        }
+        .content {
+            margin-left: 280px;
+            padding: 40px;
+            max-width: 900px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .markdown-body {
+            box-sizing: border-box;
+            min-width: 200px;
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 45px;
+        }
+        @media (max-width: 767px) {
+            .markdown-body { padding: 15px; }
+            body { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; position: relative; border-right: none; border-bottom: 1px solid #d0d7de; }
+            .content { margin-left: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h3>主目录</h3><ul></ul><h3>使用文档 (docs)</h3><ul><li><a href="../../docs/cheatsheet.html">cheatsheet.md</a></li><li><a href="../../docs/README.html">README.md</a></li><li><a href="../../docs/architecture.html">architecture.md</a></li><li><a href="../../docs/usage.html">usage.md</a></li><li><a href="../../docs/best-practices.html">best-practices.md</a></li><li><a href="../../docs/code-usage.html">code-usage.md</a></li><li><a href="../../docs/gateway-sdk.html">gateway-sdk.md</a></li><li><a href="../../docs/internals.html">internals.md</a></li><li><a href="../../docs/optimize2ai.html">optimize2ai.md</a></li><li><a href="../../docs/php-vs-go.html">php-vs-go.md</a></li></ul><h3>包文档 (pkg)</h3><ul><li><a href="../../pkg/context/README.html">pkg/context</a></li><li><a href="../../pkg/crypto/README.html">pkg/crypto</a></li><li><a href="../../pkg/gateway/README.html">pkg/gateway</a></li><li><a href="../../pkg/gateway_api/README.html">pkg/gateway_api</a></li><li><a href="../../pkg/gateway_sdk/README.html">pkg/gateway_sdk</a></li><li><a href="../../pkg/protocol/README.html">pkg/protocol</a></li><li><a href="../../pkg/register/README.html">pkg/register</a></li><li><a href="../../pkg/worker/README.html">pkg/worker</a></li></ul>
+    </div>
+    <div class="content markdown-body">
+        <h1 id="gateway-sdk-">gateway_sdk 包</h1>
+<h2 id="heading">功能</h2>
+<p>提供从 <strong>外部应用</strong>（非 Worker 进程）直接调用 Gateway API 的 SDK。</p>
+<p>对应 PHP 版在<strong>非 workerman 环境</strong>中使用 <code>GatewayClient\Gateway</code> 类的场景（如在 HTTP 控制器、定时任务中向客户端推送消息）。</p>
+<h2 id="heading-1">原理</h2>
+<h3 id="heading-2">使用场景</h3>
+<pre><code>┌──────────────────┐
+│   HTTP API 服务   │ ← 收到 REST 请求
+│  (独立进程/服务)   │
+│                  │
+│  sdk.SendToUID(&quot;user123&quot;, msg)
+│       ↓                         
+│  GatewaySDK ──→ Register ──→ 获取 Gateway 地址
+│       │                         
+│       └──→ Gateway-1 (直连 TCP)
+│       └──→ Gateway-2 (直连 TCP)
+└──────────────────┘
+</code></pre>
+<p>与 <code>gateway_api</code> 包的区别：</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>gateway_api</th>
+<th>gateway_sdk</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>运行环境</td>
+<td>Worker 进程内部</td>
+<td>任意外部进程</td>
+</tr>
+<tr>
+<td>Gateway 地址来源</td>
+<td>通过 BusinessWorker</td>
+<td>自行连接 Register 获取</td>
+</tr>
+<tr>
+<td>连接类型</td>
+<td>复用 Worker 连接 + 独立查询池</td>
+<td>全部独立连接</td>
+</tr>
+<tr>
+<td>认证方式</td>
+<td>通过 Worker 已认证</td>
+<td><code>CmdGatewayClientConnect</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="heading-3">连接管理</h3>
+<ul>
+<li>通过 Register 获取 Gateway 地址（1 秒缓存）</li>
+<li>到每个 Gateway 的连接带 50 秒 TTL 缓存</li>
+<li>所有通讯 AES-256-CBC 加密</li>
+</ul>
+<h2 id="api-">API 方法</h2>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SendToClient(clientID, message)</code></td>
+<td>向指定客户端发送</td>
+</tr>
+<tr>
+<td><code>SendToAll(message)</code></td>
+<td>广播</td>
+</tr>
+<tr>
+<td><code>SendToUID(uid, message)</code></td>
+<td>向 UID 发送</td>
+</tr>
+<tr>
+<td><code>SendToGroup(group, message)</code></td>
+<td>向分组发送</td>
+</tr>
+<tr>
+<td><code>BindUID(clientID, uid)</code></td>
+<td>绑定 UID</td>
+</tr>
+<tr>
+<td><code>UnbindUID(clientID, uid)</code></td>
+<td>解绑 UID</td>
+</tr>
+<tr>
+<td><code>JoinGroup(clientID, group)</code></td>
+<td>加入分组</td>
+</tr>
+<tr>
+<td><code>LeaveGroup(clientID, group)</code></td>
+<td>离开分组</td>
+</tr>
+<tr>
+<td><code>Ungroup(group)</code></td>
+<td>解散分组</td>
+</tr>
+<tr>
+<td><code>CloseClient(clientID, message)</code></td>
+<td>踢出客户端</td>
+</tr>
+<tr>
+<td><code>DestroyClient(clientID)</code></td>
+<td>销毁连接</td>
+</tr>
+<tr>
+<td><code>SetSession(clientID, session)</code></td>
+<td>设置 session</td>
+</tr>
+<tr>
+<td><code>UpdateSession(clientID, session)</code></td>
+<td>更新 session</td>
+</tr>
+<tr>
+<td><code>GetSession(clientID)</code></td>
+<td>获取 session</td>
+</tr>
+<tr>
+<td><code>IsOnline(clientID)</code></td>
+<td>判断是否在线</td>
+</tr>
+<tr>
+<td><code>IsUidOnline(uid)</code></td>
+<td>UID 是否在线</td>
+</tr>
+<tr>
+<td><code>GetAllClientCount()</code></td>
+<td>在线总数</td>
+</tr>
+<tr>
+<td><code>GetClientCountByGroup(group)</code></td>
+<td>分组在线数</td>
+</tr>
+<tr>
+<td><code>GetAllClientIdList()</code></td>
+<td>全部 client_id</td>
+</tr>
+<tr>
+<td><code>GetClientIdByUid(uid)</code></td>
+<td>UID → client_id</td>
+</tr>
+<tr>
+<td><code>GetUidByClientId(clientID)</code></td>
+<td>client_id → UID</td>
+</tr>
+<tr>
+<td><code>GetAllUidList()</code></td>
+<td>全部在线 UID</td>
+</tr>
+<tr>
+<td><code>GetAllGroupIdList()</code></td>
+<td>全部在线分组</td>
+</tr>
+</tbody>
+</table>
+<h2 id="heading-4">使用示例</h2>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="nx">sdk</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">gateway_sdk</span><span class="p">.</span><span class="nf">New</span><span class="p">(</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">[]</span><span class="kt">string</span><span class="p">{</span><span class="s">&#34;127.0.0.1:1236&#34;</span><span class="p">},</span><span class="w">  </span><span class="c1">// Register 地址</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="s">&#34;your-secret-key&#34;</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="k">defer</span><span class="w"> </span><span class="nx">sdk</span><span class="p">.</span><span class="nf">Close</span><span class="p">()</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="c1">// 向某个用户推送消息</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="nx">sdk</span><span class="p">.</span><span class="nf">SendToUID</span><span class="p">(</span><span class="s">&#34;user123&#34;</span><span class="p">,</span><span class="w"> </span><span class="p">[]</span><span class="nb">byte</span><span class="p">(</span><span class="s">`{&#34;type&#34;:&#34;notification&#34;,&#34;msg&#34;:&#34;hello&#34;}`</span><span class="p">))</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="c1">// 检查用户是否在线</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="nx">online</span><span class="p">,</span><span class="w"> </span><span class="nx">_</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">sdk</span><span class="p">.</span><span class="nf">IsOnline</span><span class="p">(</span><span class="nx">clientID</span><span class="p">)</span><span class="w">
+</span></span></span></code></pre>
+    </div>
+</body>
+</html>

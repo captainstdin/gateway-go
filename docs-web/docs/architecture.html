@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>architecture.md - GatewayWorker-Go 文档</title>
+    <link rel="stylesheet" href="../github-markdown.css">
+    <link rel="stylesheet" href="../chroma.css">
+    <style>
+        body {
+            display: flex;
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+            background-color: #fff;
+            color: #24292f;
+        }
+        .sidebar {
+            width: 280px;
+            height: 100vh;
+            overflow-y: auto;
+            background: #f6f8fa;
+            border-right: 1px solid #d0d7de;
+            padding: 20px;
+            position: fixed;
+            box-sizing: border-box;
+        }
+        .sidebar h3 {
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+            font-size: 14px;
+            color: #57606a;
+            text-transform: uppercase;
+        }
+        .sidebar h3:first-child { margin-top: 0; }
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .sidebar li {
+            margin-bottom: 6px;
+        }
+        .sidebar a {
+            text-decoration: none;
+            color: #0969da;
+            font-size: 14px;
+            display: block;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        .sidebar a:hover {
+            background-color: #eaf0f6;
+            text-decoration: underline;
+        }
+        .content {
+            margin-left: 280px;
+            padding: 40px;
+            max-width: 900px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .markdown-body {
+            box-sizing: border-box;
+            min-width: 200px;
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 45px;
+        }
+        @media (max-width: 767px) {
+            .markdown-body { padding: 15px; }
+            body { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; position: relative; border-right: none; border-bottom: 1px solid #d0d7de; }
+            .content { margin-left: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h3>主目录</h3><ul></ul><h3>使用文档 (docs)</h3><ul><li><a href="../docs/cheatsheet.html">cheatsheet.md</a></li><li><a href="../docs/README.html">README.md</a></li><li><a href="../docs/architecture.html">architecture.md</a></li><li><a href="../docs/usage.html">usage.md</a></li><li><a href="../docs/best-practices.html">best-practices.md</a></li><li><a href="../docs/code-usage.html">code-usage.md</a></li><li><a href="../docs/gateway-sdk.html">gateway-sdk.md</a></li><li><a href="../docs/internals.html">internals.md</a></li><li><a href="../docs/optimize2ai.html">optimize2ai.md</a></li><li><a href="../docs/php-vs-go.html">php-vs-go.md</a></li></ul><h3>包文档 (pkg)</h3><ul><li><a href="../pkg/context/README.html">pkg/context</a></li><li><a href="../pkg/crypto/README.html">pkg/crypto</a></li><li><a href="../pkg/gateway/README.html">pkg/gateway</a></li><li><a href="../pkg/gateway_api/README.html">pkg/gateway_api</a></li><li><a href="../pkg/gateway_sdk/README.html">pkg/gateway_sdk</a></li><li><a href="../pkg/protocol/README.html">pkg/protocol</a></li><li><a href="../pkg/register/README.html">pkg/register</a></li><li><a href="../pkg/worker/README.html">pkg/worker</a></li></ul>
+    </div>
+    <div class="content markdown-body">
+        <h1 id="gatewayworker-go-">GatewayWorker-Go 架构原理</h1>
+<h2 id="heading">整体架构</h2>
+<p>GatewayWorker-Go 采用 <strong>Gateway + Worker 分离</strong> 的架构，将网络 IO 与业务逻辑解耦，实现高性能、可横向扩展的实时通讯服务。</p>
+<pre><code>                         ┌──────────────────┐
+                         │     Register     │
+                         │    (注册中心)     │
+                         └─┬──────┬──────┬──┘
+                  注册/发现│      │      │发现Gateway地址
+             ┌────────────┘      │      └────────────────┐
+             ▼                   │注册/发现               ▼
+┌────────────────────────┐       │        ┌──────────────────────┐
+│        Gateway         │       │        │     GatewaySDK       │
+│  (网关，管理客户端连接)  │       │        │    (独立推送 SDK)     │
+└──┬──────────────────┬──┘       │        └──────────┬───────────┘
+   │                  │          │                   │
+   │ WebSocket/TCP    │ GatewayProtocol+AES          │ GatewayProtocol+AES
+   │ (对外客户端)     │ (内部命令端口)                │ (连接内部命令端口)
+   ▼                  ▼          ▼                   │
+┌────────┐    ┌──────────────────────┐               │
+│ Client │    │    BusinessWorker    │◄──────────────┘
+│        │    │    (业务逻辑处理)     │  (走同一个内部端口，
+└────────┘    └──────────────────────┘   认证方式不同)
+</code></pre>
+<blockquote>
+<p><strong>GatewaySDK 本质上是一个&quot;主动型 BusinessWorker&quot;</strong>：它和 BusinessWorker 一样连接 Register 发现 Gateway 地址，然后连接 Gateway 的内部命令端口发送指令。区别在于：</p>
+<ul>
+<li>BusinessWorker 使用 <code>CMD_WORKER_CONNECT</code> 认证，<strong>被动</strong>接收 Gateway 转发的客户端事件</li>
+<li>GatewaySDK 使用 <code>CMD_GATEWAY_CLIENT_CONNECT</code> 认证，<strong>主动</strong>向 Gateway 发送推送/查询等指令</li>
+</ul>
+</blockquote>
+<hr>
+<h2 id="heading-1">工作流程</h2>
+<ol>
+<li><strong>启动 Register</strong> — 监听 TCP 端口，等待 Gateway 和 Worker 注册</li>
+<li><strong>启动 Gateway</strong> — 向 Register 注册自己的内部通讯地址，同时监听客户端连接（WebSocket/TCP）</li>
+<li><strong>启动 Worker</strong> — 向 Register 注册，Register 回复所有 Gateway 地址，Worker 连接所有 Gateway</li>
+<li><strong>客户端连接</strong> — 客户端通过 WebSocket 或 TCP 连接到 Gateway</li>
+<li><strong>消息转发</strong> — Gateway 收到客户端消息后，通过内部协议转发给 Worker</li>
+<li><strong>业务处理</strong> — Worker 执行业务逻辑（用户编写的回调函数），通过 API 向客户端发送响应</li>
+</ol>
+<h3 id="heading-2">消息流转详细过程</h3>
+<pre><code>客户端发送消息:
+  Client --[WebSocket/TCP]--&gt; Gateway --[GatewayProtocol+AES]--&gt; Worker
+                                                                  │
+                                                           OnMessage(clientID, msg)
+                                                                  │
+                                                        gateway_api.SendToClient()
+                                                                  │
+  Client &lt;--[WebSocket/TCP]-- Gateway &lt;--[GatewayProtocol+AES]----┘
+</code></pre>
+<hr>
+<h2 id="-gateway--worker">为什么分离 Gateway 和 Worker？</h2>
+<table>
+<thead>
+<tr>
+<th>优势</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>热更新</strong></td>
+<td>重启 Worker 不影响客户端连接，Gateway 维持长连接</td>
+</tr>
+<tr>
+<td><strong>横向扩展</strong></td>
+<td>Gateway 和 Worker 可独立扩容，按需分配资源</td>
+</tr>
+<tr>
+<td><strong>职责分离</strong></td>
+<td>Gateway 专注 IO，Worker 专注业务，互不干扰</td>
+</tr>
+<tr>
+<td><strong>分布式部署</strong></td>
+<td>三个组件可部署在不同服务器上</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="heading-3">五个组件详解</h2>
+<h3 id="register">Register（注册中心）</h3>
+<ul>
+<li><strong>职责</strong>：维护 Gateway 和 Worker 的地址列表，当 Gateway 上线/下线时通知所有 Worker</li>
+<li><strong>协议</strong>：文本协议（JSON + AES加密 + Base64编码 + <code>\n</code> 分隔）</li>
+<li><strong>监听地址</strong>：支持 URI 格式，如 <code>text://0.0.0.0:51234</code></li>
+<li><strong>无状态</strong>：不存储业务数据，仅做服务发现和状态中转</li>
+<li><strong>高可用</strong>：支持部署<strong>多个 Register 实例</strong>，Gateway/Worker 同时连接所有 Register，任一 Register 存活即可正常工作</li>
+</ul>
+<p><strong>支持的事件</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>事件</th>
+<th>发送方</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gateway_connect</code></td>
+<td>Gateway</td>
+<td>Gateway 注册，携带内部通讯地址</td>
+</tr>
+<tr>
+<td><code>worker_connect</code></td>
+<td>Worker</td>
+<td>Worker 注册，携带 worker 名称</td>
+</tr>
+<tr>
+<td><code>worker_stats</code></td>
+<td>Worker</td>
+<td>Worker 每 3 秒上报处理计数</td>
+</tr>
+<tr>
+<td><code>admin_connect</code></td>
+<td>Dashboard</td>
+<td>管理后台连接，订阅实时状态推送</td>
+</tr>
+<tr>
+<td><code>ping</code></td>
+<td>任意</td>
+<td>心跳保活</td>
+</tr>
+<tr>
+<td><code>broadcast_addresses</code></td>
+<td>Register</td>
+<td>广播 Gateway 地址列表给 Worker</td>
+</tr>
+<tr>
+<td><code>status_update</code></td>
+<td>Register</td>
+<td>推送完整状态（gateways+workers）给 Admin</td>
+</tr>
+</tbody>
+</table>
+<p><strong>多 Register 高可用原理</strong>：</p>
+<pre><code>Register-A (192.168.1.10:51234)     Register-B (192.168.1.11:51234)
+     ▲    ▲                              ▲    ▲
+     │    └──── Worker ──────────────────┘    │
+     │                                        │
+     └──────── Gateway ──────────────────────┘
+
+• 每个 Gateway 向所有 Register 注册（独立连接）
+• 每个 Worker  连接所有 Register 接收广播
+• Register 之间互不通信，各自独立维护地址列表
+• 任一 Register 宕机，其余 Register 继续提供服务发现
+• 所有 Register 都宕机时，已建立的 Gateway⇔Worker 连接不受影响
+</code></pre>
+<h3 id="gateway">Gateway（网关）</h3>
+<p>Gateway 维护两类连接：</p>
+<p><strong>对外连接（客户端）</strong>：</p>
+<ul>
+<li>同时支持 <strong>WebSocket</strong> 和 <strong>TCP</strong>（4字节长度头协议）</li>
+<li>监听地址支持 URI 格式：<code>websocket://0.0.0.0:7272</code>、<code>tcp://0.0.0.0:7273</code>、<code>ws://0.0.0.0:7272</code></li>
+<li>支持逗号分隔同时监听多个地址</li>
+<li>为每个客户端分配全局唯一的 <code>connection_id</code>（uint32，最大约 42.9 亿）</li>
+<li>维护 session、UID 绑定、Group 分组等状态</li>
+</ul>
+<p><strong>对内连接（Worker/GatewaySDK）</strong>：</p>
+<ul>
+<li>监听内部 TCP 端口（<code>lanIP:startPort+instanceID</code>），使用 GatewayProtocol + AES</li>
+<li>接收 Worker/GatewaySDK 的连接和指令（发消息、踢人、绑定UID、加入Group 等 30+ 种命令）</li>
+</ul>
+<p><strong>路由策略</strong>：</p>
+<ul>
+<li><code>least_connections</code>（默认）：将客户端路由到连接数最少的 Worker，自动负载均衡</li>
+<li><code>random</code>：随机选择 Worker</li>
+<li>绑定模式：同一客户端的所有消息始终路由到同一个 Worker</li>
+</ul>
+<h3 id="businessworker">BusinessWorker（业务处理器）</h3>
+<ul>
+<li>启动后连接 Register 获取所有 Gateway 地址</li>
+<li>与每个 Gateway 建立 TCP 长连接</li>
+<li>接收 Gateway 转发的事件，调用用户回调</li>
+<li>内置处理计数器（<code>uint64</code>），每处理一条消息自增</li>
+<li>每 3 秒向 Register 上报处理统计（<code>worker_stats</code> 事件）</li>
+<li>与 Gateway 或 Register 断线后自动重连</li>
+</ul>
+<h3 id="gatewaysdk-sdk">GatewaySDK（独立推送 SDK）</h3>
+<ul>
+<li>不依赖 Worker 进程，可从任意 Go 程序使用</li>
+<li>连接 Register 发现 Gateway 地址（带 1 秒缓存）</li>
+<li>使用连接池复用到 Gateway 的 TCP 连接（50 秒 TTL）</li>
+<li>使用 <code>CMD_GATEWAY_CLIENT_CONNECT</code> 命令认证（区别于 Worker 的 <code>CMD_WORKER_CONNECT</code>）</li>
+</ul>
+<h3 id="dashboard">Dashboard（监控面板）</h3>
+<ul>
+<li>独立 web 程序，提供实时可视化监控</li>
+<li>以 <code>admin_connect</code> 身份连接 Register，订阅状态变更推送</li>
+<li>每 3 秒轮询各 Gateway 获取在线连接数</li>
+<li>通过 WebSocket 将数据实时推送到浏览器</li>
+<li>展示内容：Gateway 列表 + 在线连接数、Worker 列表 + 累计处理次数</li>
+</ul>
+<hr>
+<h2 id="heading-4">通讯协议</h2>
+<h3 id="heading-5">客户端协议</h3>
+<p><strong>WebSocket</strong>：标准 WebSocket 协议，消息直接作为帧收发。</p>
+<p><strong>TCP</strong>：4 字节长度前缀协议：</p>
+<pre><code>┌────────────────────┬──────────────────────┐
+│ 4字节 pack_len (BE)│  pack_len 字节 body  │
+└────────────────────┴──────────────────────┘
+</code></pre>
+<h3 id="gatewayprotocol">GatewayProtocol（内部二进制协议）</h3>
+<p>Gateway 与 Worker 间的通讯协议，28 字节固定头部 + 变长数据，全部 Big-Endian：</p>
+<pre><code>偏移  大小  字段            说明
+─────────────────────────────────────
+ 0    4    pack_len        整包长度
+ 4    1    cmd             命令字
+ 5    4    local_ip        Gateway 内网 IP
+ 9    2    local_port      Gateway 内部端口
+11    4    client_ip       客户端 IP
+15    2    client_port     客户端端口
+17    4    connection_id   连接 ID
+21    1    flag            标志位
+22    2    gateway_port    Gateway 对外端口
+24    4    ext_len         ext_data 长度
+28    变长  ext_data        扩展数据 (session等)
+28+N  变长  body            包体
+</code></pre>
+<h3 id="heading-6">命令字一览</h3>
+<table>
+<thead>
+<tr>
+<th>命令</th>
+<th>值</th>
+<th>方向</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CMD_ON_CONNECT</td>
+<td>1</td>
+<td>G→W</td>
+<td>新客户端连接</td>
+</tr>
+<tr>
+<td>CMD_ON_MESSAGE</td>
+<td>3</td>
+<td>G→W</td>
+<td>客户端消息</td>
+</tr>
+<tr>
+<td>CMD_ON_CLOSE</td>
+<td>4</td>
+<td>G→W</td>
+<td>客户端断开</td>
+</tr>
+<tr>
+<td>CMD_SEND_TO_ONE</td>
+<td>5</td>
+<td>W→G</td>
+<td>发给单个客户端</td>
+</tr>
+<tr>
+<td>CMD_SEND_TO_ALL</td>
+<td>6</td>
+<td>W→G</td>
+<td>广播</td>
+</tr>
+<tr>
+<td>CMD_KICK</td>
+<td>7</td>
+<td>W→G</td>
+<td>踢出客户端</td>
+</tr>
+<tr>
+<td>CMD_DESTROY</td>
+<td>8</td>
+<td>W→G</td>
+<td>销毁连接</td>
+</tr>
+<tr>
+<td>CMD_UPDATE_SESSION</td>
+<td>9</td>
+<td>W→G</td>
+<td>合并 session</td>
+</tr>
+<tr>
+<td>CMD_BIND_UID</td>
+<td>12</td>
+<td>W→G</td>
+<td>绑定 UID</td>
+</tr>
+<tr>
+<td>CMD_UNBIND_UID</td>
+<td>13</td>
+<td>W→G</td>
+<td>解绑 UID</td>
+</tr>
+<tr>
+<td>CMD_SEND_TO_UID</td>
+<td>14</td>
+<td>W→G</td>
+<td>向 UID 发送</td>
+</tr>
+<tr>
+<td>CMD_JOIN_GROUP</td>
+<td>20</td>
+<td>W→G</td>
+<td>加入分组</td>
+</tr>
+<tr>
+<td>CMD_LEAVE_GROUP</td>
+<td>21</td>
+<td>W→G</td>
+<td>离开分组</td>
+</tr>
+<tr>
+<td>CMD_SEND_TO_GROUP</td>
+<td>22</td>
+<td>W→G</td>
+<td>向分组发送</td>
+</tr>
+<tr>
+<td>CMD_UNGROUP</td>
+<td>27</td>
+<td>W→G</td>
+<td>解散分组</td>
+</tr>
+<tr>
+<td>CMD_WORKER_CONNECT</td>
+<td>200</td>
+<td>W→G</td>
+<td>Worker 认证</td>
+</tr>
+<tr>
+<td>CMD_PING</td>
+<td>201</td>
+<td>双向</td>
+<td>心跳</td>
+</tr>
+<tr>
+<td>CMD_GATEWAY_CLIENT_CONNECT</td>
+<td>202</td>
+<td>C→G</td>
+<td>GatewaySDK 认证</td>
+</tr>
+<tr>
+<td>CMD_ON_WEBSOCKET_CONNECT</td>
+<td>205</td>
+<td>G→W</td>
+<td>WS 握手完成</td>
+</tr>
+</tbody>
+</table>
+<h3 id="client-id-">Client ID 编码</h3>
+<p>每个客户端有一个全局唯一的 <strong>20 字符 hex</strong> 标识符（client_id），编码规则：</p>
+<pre><code>client_id = hex( uint32(local_ip) + uint16(local_port) + uint32(connection_id) )
+            ──── 4字节 ────────── ─── 2字节 ──────────── ──── 4字节 ────────────
+            = 10字节二进制 → 20字符十六进制
+</code></pre>
+<p>通过 client_id 可以直接解码出所在 Gateway 的地址，实现精确寻址。</p>
+<hr>
+<h2 id="heading-7">安全机制</h2>
+<p>所有内部通讯均使用 <strong>AES-256-CBC</strong> 加密 + <strong>SecretKey</strong> 认证双重保护：</p>
+<h3 id="heading-8">密钥派生</h3>
+<pre><code>AES Key = SHA256(SecretKey) → 32 字节
+</code></pre>
+<h3 id="register-">Register 通讯加密</h3>
+<pre><code>发送: JSON → AES-256-CBC加密(随机IV) → Base64编码 → 追加\n → TCP发送
+接收: 按\n分隔 → Base64解码 → AES-256-CBC解密 → JSON解析
+</code></pre>
+<h3 id="gatewayworker-">Gateway⇔Worker 通讯加密</h3>
+<pre><code>发送: GatewayProtocol.Encode() → AES-256-CBC加密 → 前置4字节(密文长度) → TCP发送
+接收: 读4字节长度 → 读密文 → AES-256-CBC解密 → GatewayProtocol.Decode()
+</code></pre>
+<h3 id="heading-9">认证流程</h3>
+<pre><code>Gateway → Register:  {&quot;event&quot;:&quot;gateway_connect&quot;, &quot;secret_key&quot;:&quot;xxx&quot;, &quot;address&quot;:&quot;ip:port&quot;}
+Worker  → Register:  {&quot;event&quot;:&quot;worker_connect&quot;, &quot;secret_key&quot;:&quot;xxx&quot;, &quot;name&quot;:&quot;worker:0&quot;}
+Admin   → Register:  {&quot;event&quot;:&quot;admin_connect&quot;, &quot;secret_key&quot;:&quot;xxx&quot;}
+Worker  → Register:  {&quot;event&quot;:&quot;worker_stats&quot;, &quot;name&quot;:&quot;worker:0&quot;, &quot;processed_count&quot;:12345}
+Worker  → Gateway:   CMD_WORKER_CONNECT, body={&quot;worker_key&quot;:&quot;name:id&quot;, &quot;secret_key&quot;:&quot;xxx&quot;}
+Client  → Gateway:   CMD_GATEWAY_CLIENT_CONNECT, body={&quot;secret_key&quot;:&quot;xxx&quot;}
+</code></pre>
+<p>Register 和 Gateway 均会验证 secret_key，不匹配则立即断开连接。</p>
+
+    </div>
+</body>
+</html>

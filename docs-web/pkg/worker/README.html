@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>README.md - GatewayWorker-Go 文档</title>
+    <link rel="stylesheet" href="../../github-markdown.css">
+    <link rel="stylesheet" href="../../chroma.css">
+    <style>
+        body {
+            display: flex;
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+            background-color: #fff;
+            color: #24292f;
+        }
+        .sidebar {
+            width: 280px;
+            height: 100vh;
+            overflow-y: auto;
+            background: #f6f8fa;
+            border-right: 1px solid #d0d7de;
+            padding: 20px;
+            position: fixed;
+            box-sizing: border-box;
+        }
+        .sidebar h3 {
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+            font-size: 14px;
+            color: #57606a;
+            text-transform: uppercase;
+        }
+        .sidebar h3:first-child { margin-top: 0; }
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .sidebar li {
+            margin-bottom: 6px;
+        }
+        .sidebar a {
+            text-decoration: none;
+            color: #0969da;
+            font-size: 14px;
+            display: block;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        .sidebar a:hover {
+            background-color: #eaf0f6;
+            text-decoration: underline;
+        }
+        .content {
+            margin-left: 280px;
+            padding: 40px;
+            max-width: 900px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .markdown-body {
+            box-sizing: border-box;
+            min-width: 200px;
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 45px;
+        }
+        @media (max-width: 767px) {
+            .markdown-body { padding: 15px; }
+            body { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; position: relative; border-right: none; border-bottom: 1px solid #d0d7de; }
+            .content { margin-left: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h3>主目录</h3><ul></ul><h3>使用文档 (docs)</h3><ul><li><a href="../../docs/cheatsheet.html">cheatsheet.md</a></li><li><a href="../../docs/README.html">README.md</a></li><li><a href="../../docs/architecture.html">architecture.md</a></li><li><a href="../../docs/usage.html">usage.md</a></li><li><a href="../../docs/best-practices.html">best-practices.md</a></li><li><a href="../../docs/code-usage.html">code-usage.md</a></li><li><a href="../../docs/gateway-sdk.html">gateway-sdk.md</a></li><li><a href="../../docs/internals.html">internals.md</a></li><li><a href="../../docs/optimize2ai.html">optimize2ai.md</a></li><li><a href="../../docs/php-vs-go.html">php-vs-go.md</a></li></ul><h3>包文档 (pkg)</h3><ul><li><a href="../../pkg/context/README.html">pkg/context</a></li><li><a href="../../pkg/crypto/README.html">pkg/crypto</a></li><li><a href="../../pkg/gateway/README.html">pkg/gateway</a></li><li><a href="../../pkg/gateway_api/README.html">pkg/gateway_api</a></li><li><a href="../../pkg/gateway_sdk/README.html">pkg/gateway_sdk</a></li><li><a href="../../pkg/protocol/README.html">pkg/protocol</a></li><li><a href="../../pkg/register/README.html">pkg/register</a></li><li><a href="../../pkg/worker/README.html">pkg/worker</a></li></ul>
+    </div>
+    <div class="content markdown-body">
+        <h1 id="worker-">worker 包</h1>
+<h2 id="heading">功能</h2>
+<p>实现 GatewayWorker 架构的 <strong>BusinessWorker 进程</strong>，负责处理所有业务逻辑。</p>
+<h2 id="heading-1">原理</h2>
+<p>Worker 是纯业务层，不直接与客户端通讯。它通过 Gateway 转发的协议包接收客户端事件，通过 <code>gateway_api</code> 包向客户端发送响应。</p>
+<h3 id="heading-2">工作流程</h3>
+<pre><code>1. Worker 启动 → 连接 Register 获取 Gateway 地址
+2. Worker → 连接所有 Gateway（TCP，AES 加密）
+3. Gateway 转发客户端事件 → Worker 处理业务
+4. Worker 调用 gateway_api → 通过 Gateway 向客户端发送响应
+</code></pre>
+<h3 id="heading-3">连接管理</h3>
+<pre><code>                Register
+                  │ (广播 Gateway 地址)
+                  ↓
+Worker ──────→ Gateway-1  (长连接，自动重连)
+       ──────→ Gateway-2
+       ──────→ Gateway-N
+</code></pre>
+<ul>
+<li>从 Register 获取所有 Gateway 内部通讯地址</li>
+<li>对每个 Gateway 建立独立的 TCP 长连接</li>
+<li>连接断开后自动重连（1 秒重试）</li>
+<li>定时上报处理统计信息到 Register</li>
+</ul>
+<h3 id="heading-4">事件回调</h3>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="kd">type</span><span class="w"> </span><span class="nx">BusinessWorker</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">OnWorkerStart</span><span class="w">      </span><span class="kd">func</span><span class="p">()</span><span class="w">                              </span><span class="c1">// Worker 启动</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">OnWorkerStop</span><span class="w">       </span><span class="kd">func</span><span class="p">()</span><span class="w">                              </span><span class="c1">// Worker 停止</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">OnConnect</span><span class="w">          </span><span class="kd">func</span><span class="p">(</span><span class="nx">clientID</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="w">                </span><span class="c1">// 客户端连接</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">OnMessage</span><span class="w">          </span><span class="kd">func</span><span class="p">(</span><span class="nx">clientID</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nx">message</span><span class="w"> </span><span class="p">[]</span><span class="kt">byte</span><span class="p">)</span><span class="w"> </span><span class="c1">// 客户端消息</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">OnClose</span><span class="w">            </span><span class="kd">func</span><span class="p">(</span><span class="nx">clientID</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="w">                </span><span class="c1">// 客户端断开</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">OnWebSocketConnect</span><span class="w"> </span><span class="kd">func</span><span class="p">(</span><span class="nx">clientID</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nx">data</span><span class="w"> </span><span class="p">[]</span><span class="kt">byte</span><span class="p">)</span><span class="w">   </span><span class="c1">// WebSocket 握手</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="p">}</span><span class="w">
+</span></span></span></code></pre><h3 id="heading-5">认证流程</h3>
+<p>Worker 连接 Gateway 后发送 <code>CmdWorkerConnect</code> 认证包：</p>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="p">{</span><span class="nt">&#34;worker_key&#34;</span><span class="p">:</span> <span class="s2">&#34;workerName:id&#34;</span><span class="p">,</span> <span class="nt">&#34;secret_key&#34;</span><span class="p">:</span> <span class="s2">&#34;xxx&#34;</span><span class="p">}</span>
+</span></span></code></pre><p>Gateway 验证 <code>secret_key</code> 后建立信任通道。</p>
+<h3 id="heading-6">心跳与统计</h3>
+<ul>
+<li><strong>Register 心跳</strong>：25 秒间隔</li>
+<li><strong>统计上报</strong>：3 秒间隔，上报 <code>processed_count</code>（累计处理消息数）</li>
+</ul>
+<h2 id="heading-7">导出方法</h2>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>New(name, id, registerAddr, secretKey)</code></td>
+<td>创建 Worker</td>
+</tr>
+<tr>
+<td><code>Run()</code></td>
+<td>启动 Worker</td>
+</tr>
+<tr>
+<td><code>Stop()</code></td>
+<td>停止 Worker</td>
+</tr>
+<tr>
+<td><code>SendToGateway(addr, data)</code></td>
+<td>向指定 Gateway 发送数据</td>
+</tr>
+<tr>
+<td><code>SendToAllGateways(data)</code></td>
+<td>向所有 Gateway 发送数据</td>
+</tr>
+<tr>
+<td><code>GetAllGatewayAddresses()</code></td>
+<td>获取所有 Gateway 地址</td>
+</tr>
+<tr>
+<td><code>GetProcessedCount()</code></td>
+<td>获取累计处理消息数</td>
+</tr>
+<tr>
+<td><code>ResetStats()</code></td>
+<td>重置统计计数器</td>
+</tr>
+</tbody>
+</table>
+
+    </div>
+</body>
+</html>

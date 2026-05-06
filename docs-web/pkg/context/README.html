@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>README.md - GatewayWorker-Go 文档</title>
+    <link rel="stylesheet" href="../../github-markdown.css">
+    <link rel="stylesheet" href="../../chroma.css">
+    <style>
+        body {
+            display: flex;
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+            background-color: #fff;
+            color: #24292f;
+        }
+        .sidebar {
+            width: 280px;
+            height: 100vh;
+            overflow-y: auto;
+            background: #f6f8fa;
+            border-right: 1px solid #d0d7de;
+            padding: 20px;
+            position: fixed;
+            box-sizing: border-box;
+        }
+        .sidebar h3 {
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+            font-size: 14px;
+            color: #57606a;
+            text-transform: uppercase;
+        }
+        .sidebar h3:first-child { margin-top: 0; }
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .sidebar li {
+            margin-bottom: 6px;
+        }
+        .sidebar a {
+            text-decoration: none;
+            color: #0969da;
+            font-size: 14px;
+            display: block;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        .sidebar a:hover {
+            background-color: #eaf0f6;
+            text-decoration: underline;
+        }
+        .content {
+            margin-left: 280px;
+            padding: 40px;
+            max-width: 900px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .markdown-body {
+            box-sizing: border-box;
+            min-width: 200px;
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 45px;
+        }
+        @media (max-width: 767px) {
+            .markdown-body { padding: 15px; }
+            body { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; position: relative; border-right: none; border-bottom: 1px solid #d0d7de; }
+            .content { margin-left: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h3>主目录</h3><ul></ul><h3>使用文档 (docs)</h3><ul><li><a href="../../docs/cheatsheet.html">cheatsheet.md</a></li><li><a href="../../docs/README.html">README.md</a></li><li><a href="../../docs/architecture.html">architecture.md</a></li><li><a href="../../docs/usage.html">usage.md</a></li><li><a href="../../docs/best-practices.html">best-practices.md</a></li><li><a href="../../docs/code-usage.html">code-usage.md</a></li><li><a href="../../docs/gateway-sdk.html">gateway-sdk.md</a></li><li><a href="../../docs/internals.html">internals.md</a></li><li><a href="../../docs/optimize2ai.html">optimize2ai.md</a></li><li><a href="../../docs/php-vs-go.html">php-vs-go.md</a></li></ul><h3>包文档 (pkg)</h3><ul><li><a href="../../pkg/context/README.html">pkg/context</a></li><li><a href="../../pkg/crypto/README.html">pkg/crypto</a></li><li><a href="../../pkg/gateway/README.html">pkg/gateway</a></li><li><a href="../../pkg/gateway_api/README.html">pkg/gateway_api</a></li><li><a href="../../pkg/gateway_sdk/README.html">pkg/gateway_sdk</a></li><li><a href="../../pkg/protocol/README.html">pkg/protocol</a></li><li><a href="../../pkg/register/README.html">pkg/register</a></li><li><a href="../../pkg/worker/README.html">pkg/worker</a></li></ul>
+    </div>
+    <div class="content markdown-body">
+        <h1 id="context-">context 包</h1>
+<h2 id="heading">功能</h2>
+<p>提供 Gateway Worker 架构中的 <strong>请求上下文管理</strong> 和 <strong>客户端标识转换</strong> 工具。</p>
+<h2 id="heading-1">核心概念</h2>
+<h3 id="client-id">Client ID</h3>
+<p>每个客户端连接由一个 <strong>20 字符的十六进制字符串</strong> 唯一标识，编码规则：</p>
+<pre><code>client_id = hex(pack(localIP, localPort, connectionID))
+         = hex([4字节IP][2字节端口][4字节连接ID])
+         = 20 个 hex 字符
+</code></pre>
+<p>与 PHP 版 <code>Context::addressToClientId</code> / <code>Context::clientIdToAddress</code> 完全兼容。</p>
+<h3 id="session">Session</h3>
+<p>使用 JSON 编解码的 <code>map[string]interface{}</code> 存储每个连接的会话数据。</p>
+<h2 id="heading-2">导出函数</h2>
+<table>
+<thead>
+<tr>
+<th>函数</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AddressToClientID(ip, port, connID)</code></td>
+<td>将网络地址编码为 client_id</td>
+</tr>
+<tr>
+<td><code>ClientIDToAddress(clientID)</code></td>
+<td>将 client_id 解码为网络地址</td>
+</tr>
+<tr>
+<td><code>SessionEncode(session)</code></td>
+<td>Session map → JSON 字符串</td>
+</tr>
+<tr>
+<td><code>SessionDecode(data)</code></td>
+<td>JSON 字符串 → Session map</td>
+</tr>
+</tbody>
+</table>
+<h2 id="context--1">Context 结构体</h2>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="kd">type</span><span class="w"> </span><span class="nx">Context</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">LocalIP</span><span class="p">,</span><span class="w"> </span><span class="nx">ClientIP</span><span class="w">       </span><span class="kt">uint32</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">LocalPort</span><span class="p">,</span><span class="w"> </span><span class="nx">ClientPort</span><span class="w">   </span><span class="kt">uint16</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">ClientID</span><span class="w">                </span><span class="kt">string</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">ConnectionID</span><span class="w">            </span><span class="kt">uint32</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">Session</span><span class="p">,</span><span class="w"> </span><span class="nx">OldSession</span><span class="w">     </span><span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="kd">interface</span><span class="p">{}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="p">}</span><span class="w">
+</span></span></span></code></pre><p>由 BusinessWorker 在处理每个 Gateway 转发的请求时设置，包含当前请求的完整连接信息。</p>
+
+    </div>
+</body>
+</html>

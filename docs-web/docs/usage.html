@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>usage.md - GatewayWorker-Go 文档</title>
+    <link rel="stylesheet" href="../github-markdown.css">
+    <link rel="stylesheet" href="../chroma.css">
+    <style>
+        body {
+            display: flex;
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+            background-color: #fff;
+            color: #24292f;
+        }
+        .sidebar {
+            width: 280px;
+            height: 100vh;
+            overflow-y: auto;
+            background: #f6f8fa;
+            border-right: 1px solid #d0d7de;
+            padding: 20px;
+            position: fixed;
+            box-sizing: border-box;
+        }
+        .sidebar h3 {
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+            font-size: 14px;
+            color: #57606a;
+            text-transform: uppercase;
+        }
+        .sidebar h3:first-child { margin-top: 0; }
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .sidebar li {
+            margin-bottom: 6px;
+        }
+        .sidebar a {
+            text-decoration: none;
+            color: #0969da;
+            font-size: 14px;
+            display: block;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        .sidebar a:hover {
+            background-color: #eaf0f6;
+            text-decoration: underline;
+        }
+        .content {
+            margin-left: 280px;
+            padding: 40px;
+            max-width: 900px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .markdown-body {
+            box-sizing: border-box;
+            min-width: 200px;
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 45px;
+        }
+        @media (max-width: 767px) {
+            .markdown-body { padding: 15px; }
+            body { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; position: relative; border-right: none; border-bottom: 1px solid #d0d7de; }
+            .content { margin-left: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h3>主目录</h3><ul></ul><h3>使用文档 (docs)</h3><ul><li><a href="../docs/cheatsheet.html">cheatsheet.md</a></li><li><a href="../docs/README.html">README.md</a></li><li><a href="../docs/architecture.html">architecture.md</a></li><li><a href="../docs/usage.html">usage.md</a></li><li><a href="../docs/best-practices.html">best-practices.md</a></li><li><a href="../docs/code-usage.html">code-usage.md</a></li><li><a href="../docs/gateway-sdk.html">gateway-sdk.md</a></li><li><a href="../docs/internals.html">internals.md</a></li><li><a href="../docs/optimize2ai.html">optimize2ai.md</a></li><li><a href="../docs/php-vs-go.html">php-vs-go.md</a></li></ul><h3>包文档 (pkg)</h3><ul><li><a href="../pkg/context/README.html">pkg/context</a></li><li><a href="../pkg/crypto/README.html">pkg/crypto</a></li><li><a href="../pkg/gateway/README.html">pkg/gateway</a></li><li><a href="../pkg/gateway_api/README.html">pkg/gateway_api</a></li><li><a href="../pkg/gateway_sdk/README.html">pkg/gateway_sdk</a></li><li><a href="../pkg/protocol/README.html">pkg/protocol</a></li><li><a href="../pkg/register/README.html">pkg/register</a></li><li><a href="../pkg/worker/README.html">pkg/worker</a></li></ul>
+    </div>
+    <div class="content markdown-body">
+        <h1 id="gatewayworker-go-">GatewayWorker-Go 使用指南</h1>
+<h2 id="heading">快速开始</h2>
+<h3 id="heading-1">编译</h3>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="nb">cd</span> Gatewayworker-go
+</span></span><span class="line"><span class="cl">go build -o bin/register     ./cmd/register
+</span></span><span class="line"><span class="cl">go build -o bin/gateway      ./cmd/gateway
+</span></span><span class="line"><span class="cl">go build -o bin/worker       ./cmd/worker
+</span></span><span class="line"><span class="cl">go build -o bin/dashboard    ./cmd/dashboard
+</span></span><span class="line"><span class="cl">go build -o bin/gateway-edit ./cmd/gateway-edit  <span class="c1"># 自定义协议示例</span>
+</span></span></code></pre><h3 id="heading-2">启动服务</h3>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="c1"># 终端1: Register</span>
+</span></span><span class="line"><span class="cl">./bin/register -listen <span class="s2">&#34;text://0.0.0.0:51234&#34;</span> -key <span class="s2">&#34;my-secret-key&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># 终端2: Gateway（WebSocket + TCP 双协议）</span>
+</span></span><span class="line"><span class="cl">./bin/gateway -listen <span class="s2">&#34;websocket://0.0.0.0:7272,tcp://0.0.0.0:7273&#34;</span> -key <span class="s2">&#34;my-secret-key&#34;</span> -register <span class="s2">&#34;127.0.0.1:51234&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># 终端3: Worker（内置 echo 示例）</span>
+</span></span><span class="line"><span class="cl">./bin/worker -key <span class="s2">&#34;my-secret-key&#34;</span> -register <span class="s2">&#34;127.0.0.1:51234&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># 终端4: Dashboard（可选）</span>
+</span></span><span class="line"><span class="cl">./bin/dashboard -listen <span class="s2">&#34;0.0.0.0:8686&#34;</span> -key <span class="s2">&#34;my-secret-key&#34;</span> -register <span class="s2">&#34;127.0.0.1:51234&#34;</span>
+</span></span></code></pre><h3 id="heading-3">测试连接</h3>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="c1">// 浏览器控制台
+</span></span></span><span class="line"><span class="cl"><span class="kr">const</span> <span class="nx">ws</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">WebSocket</span><span class="p">(</span><span class="s1">&#39;ws://127.0.0.1:7272&#39;</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl"><span class="nx">ws</span><span class="p">.</span><span class="nx">onopen</span> <span class="o">=</span> <span class="p">()</span> <span class="p">=&gt;</span> <span class="nx">ws</span><span class="p">.</span><span class="nx">send</span><span class="p">(</span><span class="s1">&#39;Hello!&#39;</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl"><span class="nx">ws</span><span class="p">.</span><span class="nx">onmessage</span> <span class="o">=</span> <span class="p">(</span><span class="nx">e</span><span class="p">)</span> <span class="p">=&gt;</span> <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s1">&#39;收到:&#39;</span><span class="p">,</span> <span class="nx">e</span><span class="p">.</span><span class="nx">data</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl"><span class="c1">// 输出: 收到: echo: Hello!
+</span></span></span></code></pre><h3 id="heading-4">监控面板</h3>
+<p>浏览器打开 <code>http://localhost:8686</code>，实时查看 Gateway 在线连接数和 Worker 处理次数。</p>
+<hr>
+<h2 id="heading-5">监听地址格式</h2>
+<p>所有服务的 <code>-listen</code> 参数都支持 URI 风格的协议前缀：</p>
+<table>
+<thead>
+<tr>
+<th>协议前缀</th>
+<th>说明</th>
+<th>适用组件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>text://</code></td>
+<td>文本协议（JSON + AES + Base64）</td>
+<td>Register</td>
+</tr>
+<tr>
+<td><code>tcp://</code></td>
+<td>文本协议（同 text://）</td>
+<td>Register</td>
+</tr>
+<tr>
+<td><code>websocket://</code></td>
+<td>WebSocket 协议</td>
+<td>Gateway</td>
+</tr>
+<tr>
+<td><code>ws://</code></td>
+<td>WebSocket 简写</td>
+<td>Gateway</td>
+</tr>
+<tr>
+<td><code>tcp://</code></td>
+<td>TCP 4字节 body 长度头协议（Go 版默认）</td>
+<td>Gateway</td>
+</tr>
+<tr>
+<td><code>frame://</code></td>
+<td>TCP 4字节总包长头协议（与 PHP Workerman frame 一致）</td>
+<td>Gateway</td>
+</tr>
+<tr>
+<td><code>text://</code></td>
+<td>换行符分隔文本协议（与 PHP Workerman text 一致）</td>
+<td>Gateway</td>
+</tr>
+<tr>
+<td><code>自定义://</code></td>
+<td>自定义 TCP 协议（需先注册）</td>
+<td>Gateway</td>
+</tr>
+</tbody>
+</table>
+<p>不带前缀时，Register 默认 text，Gateway 默认 websocket。</p>
+<p><strong>Gateway 多协议监听</strong>（逗号分隔）：</p>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="c1"># 同时监听 WebSocket 和 TCP</span>
+</span></span><span class="line"><span class="cl">./gateway -listen <span class="s2">&#34;websocket://0.0.0.0:7272,tcp://0.0.0.0:7273&#34;</span> -key <span class="s2">&#34;xxx&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># 只开 WebSocket</span>
+</span></span><span class="line"><span class="cl">./gateway -listen <span class="s2">&#34;ws://0.0.0.0:7272&#34;</span> -key <span class="s2">&#34;xxx&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># 使用自定义协议（需在代码中先 RegisterProtocol）</span>
+</span></span><span class="line"><span class="cl">./gateway -listen <span class="s2">&#34;websocket://0.0.0.0:7272,jsonNL://0.0.0.0:7273&#34;</span> -key <span class="s2">&#34;xxx&#34;</span>
+</span></span></code></pre><hr>
+<h2 id="-tcp-">自定义 TCP 协议</h2>
+<p>Gateway 支持自定义 TCP 应用层协议，参考 PHP Workerman 的 <code>ProtocolInterface</code> 设计。</p>
+<h3 id="heading-6">协议接口</h3>
+<p>实现 <code>ClientProtocol</code> 接口即可定义自己的协议，接口定义在 <code>pkg/gateway/client_protocol.go</code>：</p>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="kd">type</span><span class="w"> </span><span class="nx">ClientProtocol</span><span class="w"> </span><span class="kd">interface</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">// Input 从 TCP 流缓冲区中判断一个完整包的长度</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">//  返回 &gt; 0: 完整包的总长度，框架会凑齐后调用 Decode</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">//  返回 == 0: 数据不够，继续等待</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">//  返回 &lt; 0: 协议错误，关闭连接</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nf">Input</span><span class="p">(</span><span class="nx">buf</span><span class="w"> </span><span class="p">[]</span><span class="kt">byte</span><span class="p">)</span><span class="w"> </span><span class="kt">int</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">// Decode 将完整的原始数据包解码为业务数据</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nf">Decode</span><span class="p">(</span><span class="nx">buf</span><span class="w"> </span><span class="p">[]</span><span class="kt">byte</span><span class="p">)</span><span class="w"> </span><span class="p">[]</span><span class="kt">byte</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">// Encode 将业务数据编码为协议格式字节</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nf">Encode</span><span class="p">(</span><span class="nx">data</span><span class="w"> </span><span class="p">[]</span><span class="kt">byte</span><span class="p">)</span><span class="w"> </span><span class="p">[]</span><span class="kt">byte</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="p">}</span><span class="w">
+</span></span></span></code></pre><h3 id="heading-7">工作流程</h3>
+<pre><code>客户端发送数据 → TCP 流 → Input(buf) 分包
+                            ↓ 凑齐完整包
+                        Decode(packet) 解包
+                            ↓
+                     OnMessage(clientID, data) 业务回调
+
+业务回调 send(data) → Encode(data) 打包 → 发送给客户端
+</code></pre>
+<h3 id="jsonnl-">示例：JsonNL 协议</h3>
+<p>以换行符 <code>\n</code> 作为包分隔符，数据格式为 JSON（与 PHP Workerman 的 JsonNL 协议一致）：</p>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="kn">package</span><span class="w"> </span><span class="nx">main</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="kn">import</span><span class="w"> </span><span class="p">(</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="s">&#34;bytes&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="s">&#34;gatewayworker-go/pkg/gateway&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="c1">// JsonNLProtocol 以 \n 分隔的 JSON 文本协议</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="kd">type</span><span class="w"> </span><span class="nx">JsonNLProtocol</span><span class="w"> </span><span class="kd">struct</span><span class="p">{}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">p</span><span class="w"> </span><span class="o">*</span><span class="nx">JsonNLProtocol</span><span class="p">)</span><span class="w"> </span><span class="nf">Input</span><span class="p">(</span><span class="nx">buf</span><span class="w"> </span><span class="p">[]</span><span class="kt">byte</span><span class="p">)</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">pos</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">bytes</span><span class="p">.</span><span class="nf">IndexByte</span><span class="p">(</span><span class="nx">buf</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">pos</span><span class="w"> </span><span class="p">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="c1">// 没有换行符，继续等待</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">pos</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="c1">// 包含换行符的完整包长度</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">p</span><span class="w"> </span><span class="o">*</span><span class="nx">JsonNLProtocol</span><span class="p">)</span><span class="w"> </span><span class="nf">Decode</span><span class="p">(</span><span class="nx">buf</span><span class="w"> </span><span class="p">[]</span><span class="kt">byte</span><span class="p">)</span><span class="w"> </span><span class="p">[]</span><span class="kt">byte</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">bytes</span><span class="p">.</span><span class="nf">TrimRight</span><span class="p">(</span><span class="nx">buf</span><span class="p">,</span><span class="w"> </span><span class="s">&#34;\n&#34;</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">p</span><span class="w"> </span><span class="o">*</span><span class="nx">JsonNLProtocol</span><span class="p">)</span><span class="w"> </span><span class="nf">Encode</span><span class="p">(</span><span class="nx">data</span><span class="w"> </span><span class="p">[]</span><span class="kt">byte</span><span class="p">)</span><span class="w"> </span><span class="p">[]</span><span class="kt">byte</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nb">append</span><span class="p">(</span><span class="nx">data</span><span class="p">,</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="p">}</span><span class="w">
+</span></span></span></code></pre><h3 id="heading-8">注册和使用</h3>
+<p>完整的自定义协议示例参见 <code>cmd/gateway-edit/main.go</code>。</p>
+<p><strong>编译</strong>：</p>
+<pre class="chroma"><code><span class="line"><span class="cl">go build -o bin/gateway-edit ./cmd/gateway-edit
+</span></span></code></pre><p><strong>启动</strong>（使用自定义 JsonNL 协议）：</p>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="c1"># 终端1: Register</span>
+</span></span><span class="line"><span class="cl">./bin/register -listen <span class="s2">&#34;text://0.0.0.0:51234&#34;</span> -key <span class="s2">&#34;my-secret-key&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># 终端2: Gateway（使用自定义 jsonNL 协议）</span>
+</span></span><span class="line"><span class="cl">./bin/gateway-edit -listen <span class="s2">&#34;jsonNL://0.0.0.0:7273&#34;</span> -key <span class="s2">&#34;my-secret-key&#34;</span> -register <span class="s2">&#34;127.0.0.1:51234&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># 或者 WebSocket + 自定义协议双监听</span>
+</span></span><span class="line"><span class="cl">./bin/gateway-edit -listen <span class="s2">&#34;websocket://0.0.0.0:7272,jsonNL://0.0.0.0:7273&#34;</span> -key <span class="s2">&#34;my-secret-key&#34;</span> -register <span class="s2">&#34;127.0.0.1:51234&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># 或者使用内置 text 协议（无需自定义，标准 gateway 也支持）</span>
+</span></span><span class="line"><span class="cl">./bin/gateway -listen <span class="s2">&#34;text://0.0.0.0:7273&#34;</span> -key <span class="s2">&#34;my-secret-key&#34;</span> -register <span class="s2">&#34;127.0.0.1:51234&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># 终端3: Worker</span>
+</span></span><span class="line"><span class="cl">./bin/worker -key <span class="s2">&#34;my-secret-key&#34;</span> -register <span class="s2">&#34;127.0.0.1:51234&#34;</span>
+</span></span></code></pre><p><strong>客户端测试</strong>（telnet）：</p>
+<pre class="chroma"><code><span class="line"><span class="cl">telnet 127.0.0.1 <span class="m">7273</span>
+</span></span><span class="line"><span class="cl"><span class="o">{</span><span class="s2">&#34;type&#34;</span>:<span class="s2">&#34;chat&#34;</span>,<span class="s2">&#34;msg&#34;</span>:<span class="s2">&#34;hello&#34;</span><span class="o">}</span>
+</span></span><span class="line"><span class="cl"><span class="c1"># 回车发送，Worker 会收到 OnMessage 回调</span>
+</span></span></code></pre><p><strong>关键代码</strong>（cmd/gateway-edit/main.go 中的核心步骤）：</p>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="c1">// 1. 实现 ClientProtocol 接口</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="kd">type</span><span class="w"> </span><span class="nx">JsonNLProtocol</span><span class="w"> </span><span class="kd">struct</span><span class="p">{}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">p</span><span class="w"> </span><span class="o">*</span><span class="nx">JsonNLProtocol</span><span class="p">)</span><span class="w"> </span><span class="nf">Input</span><span class="p">(</span><span class="nx">buf</span><span class="w"> </span><span class="p">[]</span><span class="kt">byte</span><span class="p">)</span><span class="w"> </span><span class="kt">int</span><span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="cm">/* 找 \n */</span><span class="w"> </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">p</span><span class="w"> </span><span class="o">*</span><span class="nx">JsonNLProtocol</span><span class="p">)</span><span class="w"> </span><span class="nf">Decode</span><span class="p">(</span><span class="nx">buf</span><span class="w"> </span><span class="p">[]</span><span class="kt">byte</span><span class="p">)</span><span class="w"> </span><span class="p">[]</span><span class="kt">byte</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="cm">/* 去掉 \n */</span><span class="w"> </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">p</span><span class="w"> </span><span class="o">*</span><span class="nx">JsonNLProtocol</span><span class="p">)</span><span class="w"> </span><span class="nf">Encode</span><span class="p">(</span><span class="nx">data</span><span class="w"> </span><span class="p">[]</span><span class="kt">byte</span><span class="p">)</span><span class="w"> </span><span class="p">[]</span><span class="kt">byte</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="cm">/* 加 \n */</span><span class="w"> </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="c1">// 2. 在 main() 中注册</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="nx">gateway</span><span class="p">.</span><span class="nf">RegisterProtocol</span><span class="p">(</span><span class="s">&#34;jsonNL&#34;</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">JsonNLProtocol</span><span class="p">{})</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="c1">// 3. 通过 -listen &#34;jsonNL://0.0.0.0:7273&#34; 启动</span><span class="w">
+</span></span></span></code></pre><h3 id="heading-9">内置协议</h3>
+<table>
+<thead>
+<tr>
+<th>协议名</th>
+<th>包格式</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>websocket</code></td>
+<td>WebSocket 帧</td>
+<td>WebSocket 协议，支持 <code>websocket://</code> 和 <code>ws://</code></td>
+</tr>
+<tr>
+<td><code>tcp</code></td>
+<td><code>[4B body长度][body]</code></td>
+<td>4字节大端 <strong>body 长度</strong> + body，Go 版默认 TCP 协议</td>
+</tr>
+<tr>
+<td><code>frame</code></td>
+<td><code>[4B 总包长][body]</code></td>
+<td>4字节大端 <strong>总包长</strong>(含头) + body，与 PHP Workerman frame 一致</td>
+</tr>
+<tr>
+<td><code>text</code></td>
+<td><code>数据\n</code></td>
+<td>换行符 <code>\n</code> 分隔的文本协议，适合 telnet 调试</td>
+</tr>
+</tbody>
+</table>
+<h3 id="-php-workerman-">与 PHP Workerman 对比</h3>
+<table>
+<thead>
+<tr>
+<th>PHP</th>
+<th>Go</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ProtocolInterface::input($buffer)</code></td>
+<td><code>ClientProtocol.Input(buf) int</code></td>
+<td>分包</td>
+</tr>
+<tr>
+<td><code>ProtocolInterface::decode($buffer)</code></td>
+<td><code>ClientProtocol.Decode(buf) []byte</code></td>
+<td>解包</td>
+</tr>
+<tr>
+<td><code>ProtocolInterface::encode($data)</code></td>
+<td><code>ClientProtocol.Encode(data) []byte</code></td>
+<td>打包</td>
+</tr>
+<tr>
+<td><code>new Gateway(&quot;JsonNL://...&quot;)</code> 自动加载</td>
+<td><code>RegisterProtocol(&quot;jsonNL&quot;, &amp;P{})</code> 手动注册</td>
+<td>Go 是静态语言</td>
+</tr>
+<tr>
+<td>协议类放在 <code>Protocols/</code> 目录自动发现</td>
+<td>在 <code>main()</code> 或 <code>init()</code> 中显式注册</td>
+<td>编译时确定</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="heading-10">配置参数</h2>
+<h3 id="register">Register</h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>默认值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-listen</code></td>
+<td><code>text://0.0.0.0:51234</code></td>
+<td>监听地址</td>
+</tr>
+<tr>
+<td><code>-key</code></td>
+<td><code>&quot;&quot;</code></td>
+<td>认证密钥（同时用于 AES 加密）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="gateway">Gateway</h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>默认值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-listen</code></td>
+<td><code>websocket://0.0.0.0:7272</code></td>
+<td>监听地址，逗号分隔多个</td>
+</tr>
+<tr>
+<td><code>-lan-ip</code></td>
+<td><code>127.0.0.1</code></td>
+<td>内网 IP（分布式部署时设为本机内网 IP）</td>
+</tr>
+<tr>
+<td><code>-start-port</code></td>
+<td><code>54321</code></td>
+<td>内部通讯起始端口</td>
+</tr>
+<tr>
+<td><code>-id</code></td>
+<td><code>0</code></td>
+<td>实例 ID（多实例时需不同）</td>
+</tr>
+<tr>
+<td><code>-register</code></td>
+<td><code>127.0.0.1:51234</code></td>
+<td>Register 地址，逗号分隔多个</td>
+</tr>
+<tr>
+<td><code>-key</code></td>
+<td><code>&quot;&quot;</code></td>
+<td>认证密钥</td>
+</tr>
+<tr>
+<td><code>-ping-interval</code></td>
+<td><code>55</code></td>
+<td>心跳间隔（秒），0 禁用</td>
+</tr>
+<tr>
+<td><code>-ping-limit</code></td>
+<td><code>0</code></td>
+<td>心跳未响应上限，0 不检测</td>
+</tr>
+<tr>
+<td><code>-router</code></td>
+<td><code>least_connections</code></td>
+<td>路由模式：<code>random</code> / <code>least_connections</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="worker">Worker</h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>默认值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-name</code></td>
+<td><code>worker</code></td>
+<td>Worker 名称</td>
+</tr>
+<tr>
+<td><code>-id</code></td>
+<td><code>0</code></td>
+<td>Worker ID</td>
+</tr>
+<tr>
+<td><code>-register</code></td>
+<td><code>127.0.0.1:51234</code></td>
+<td>Register 地址，逗号分隔多个</td>
+</tr>
+<tr>
+<td><code>-key</code></td>
+<td><code>&quot;&quot;</code></td>
+<td>认证密钥</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dashboard">Dashboard</h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>默认值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-listen</code></td>
+<td><code>0.0.0.0:8686</code></td>
+<td>Web 监听地址</td>
+</tr>
+<tr>
+<td><code>-register</code></td>
+<td><code>127.0.0.1:51234</code></td>
+<td>Register 地址，逗号分隔多个</td>
+</tr>
+<tr>
+<td><code>-key</code></td>
+<td><code>&quot;&quot;</code></td>
+<td>认证密钥</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="heading-11">业务开发</h2>
+<p>自定义业务逻辑只需修改 <code>cmd/worker/main.go</code> 中的回调函数。</p>
+<h3 id="heading-12">聊天室示例</h3>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="kn">package</span><span class="w"> </span><span class="nx">main</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="kn">import</span><span class="w"> </span><span class="p">(</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="s">&#34;encoding/json&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="s">&#34;gatewayworker-go/pkg/gateway_api&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="s">&#34;gatewayworker-go/pkg/worker&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="s">&#34;log&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="kd">func</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">bw</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">worker</span><span class="p">.</span><span class="nf">New</span><span class="p">(</span><span class="s">&#34;chat&#34;</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="p">[]</span><span class="kt">string</span><span class="p">{</span><span class="s">&#34;127.0.0.1:51234&#34;</span><span class="p">},</span><span class="w"> </span><span class="s">&#34;my-key&#34;</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">bw</span><span class="p">.</span><span class="nx">OnConnect</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kd">func</span><span class="p">(</span><span class="nx">clientID</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nx">log</span><span class="p">.</span><span class="nf">Printf</span><span class="p">(</span><span class="s">&#34;新连接: %s&#34;</span><span class="p">,</span><span class="w"> </span><span class="nx">clientID</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nx">gateway_api</span><span class="p">.</span><span class="nf">SendToClient</span><span class="p">(</span><span class="nx">clientID</span><span class="p">,</span><span class="w"> </span><span class="p">[]</span><span class="nb">byte</span><span class="p">(</span><span class="s">`{&#34;type&#34;:&#34;welcome&#34;,&#34;msg&#34;:&#34;欢迎&#34;}`</span><span class="p">))</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">bw</span><span class="p">.</span><span class="nx">OnMessage</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kd">func</span><span class="p">(</span><span class="nx">clientID</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nx">message</span><span class="w"> </span><span class="p">[]</span><span class="kt">byte</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="kd">var</span><span class="w"> </span><span class="nx">msg</span><span class="w"> </span><span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="kt">string</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nx">json</span><span class="p">.</span><span class="nf">Unmarshal</span><span class="p">(</span><span class="nx">message</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">msg</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="k">switch</span><span class="w"> </span><span class="nx">msg</span><span class="p">[</span><span class="s">&#34;type&#34;</span><span class="p">]</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="s">&#34;login&#34;</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nx">gateway_api</span><span class="p">.</span><span class="nf">BindUID</span><span class="p">(</span><span class="nx">clientID</span><span class="p">,</span><span class="w"> </span><span class="nx">msg</span><span class="p">[</span><span class="s">&#34;uid&#34;</span><span class="p">])</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nx">gateway_api</span><span class="p">.</span><span class="nf">JoinGroup</span><span class="p">(</span><span class="nx">clientID</span><span class="p">,</span><span class="w"> </span><span class="s">&#34;room_1&#34;</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="s">&#34;chat&#34;</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nx">gateway_api</span><span class="p">.</span><span class="nf">SendToGroup</span><span class="p">(</span><span class="s">&#34;room_1&#34;</span><span class="p">,</span><span class="w"> </span><span class="nx">message</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="s">&#34;private&#34;</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nx">gateway_api</span><span class="p">.</span><span class="nf">SendToUID</span><span class="p">(</span><span class="nx">msg</span><span class="p">[</span><span class="s">&#34;to_uid&#34;</span><span class="p">],</span><span class="w"> </span><span class="nx">message</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">bw</span><span class="p">.</span><span class="nx">OnClose</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kd">func</span><span class="p">(</span><span class="nx">clientID</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nx">log</span><span class="p">.</span><span class="nf">Printf</span><span class="p">(</span><span class="s">&#34;断开: %s&#34;</span><span class="p">,</span><span class="w"> </span><span class="nx">clientID</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">gateway_api</span><span class="p">.</span><span class="nf">SetBusinessWorker</span><span class="p">(</span><span class="nx">bw</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">bw</span><span class="p">.</span><span class="nf">Run</span><span class="p">()</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="p">}</span><span class="w">
+</span></span></span></code></pre><h3 id="heading-13">可用回调</h3>
+<table>
+<thead>
+<tr>
+<th>回调</th>
+<th>触发时机</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OnWorkerStart</code></td>
+<td>Worker 启动时</td>
+</tr>
+<tr>
+<td><code>OnWorkerStop</code></td>
+<td>Worker 停止时</td>
+</tr>
+<tr>
+<td><code>OnConnect</code></td>
+<td>客户端连接 Gateway 时</td>
+</tr>
+<tr>
+<td><code>OnMessage</code></td>
+<td>客户端发送消息时</td>
+</tr>
+<tr>
+<td><code>OnClose</code></td>
+<td>客户端断开时</td>
+</tr>
+<tr>
+<td><code>OnWebSocketConnect</code></td>
+<td>WebSocket 握手完成时（携带 HTTP 头信息）</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="gatewaysdk-sdk">GatewaySDK SDK</h2>
+<p>用于从 <strong>Worker 外部的其他进程</strong> 向客户端推送消息。完整 API 参考见 <a href="gateway-sdk.html">GatewaySDK SDK 文档</a>。</p>
+<h3 id="heading-14">典型场景</h3>
+<ul>
+<li>HTTP API 收到请求后推送实时通知</li>
+<li>管理后台踢出某个用户</li>
+<li>定时任务向所有在线用户广播</li>
+</ul>
+<h3 id="heading-15">使用方式</h3>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="kn">package</span><span class="w"> </span><span class="nx">main</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="kn">import</span><span class="w"> </span><span class="p">(</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="s">&#34;fmt&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="s">&#34;gatewayworker-go/pkg/gateway_sdk&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="kd">func</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">client</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">gateway_sdk</span><span class="p">.</span><span class="nf">New</span><span class="p">(</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="p">[]</span><span class="kt">string</span><span class="p">{</span><span class="s">&#34;127.0.0.1:51234&#34;</span><span class="p">},</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="s">&#34;my-secret-key&#34;</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">defer</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nf">Close</span><span class="p">()</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">// 推送给指定 UID</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">client</span><span class="p">.</span><span class="nf">SendToUID</span><span class="p">(</span><span class="s">&#34;user_100&#34;</span><span class="p">,</span><span class="w"> </span><span class="p">[]</span><span class="nb">byte</span><span class="p">(</span><span class="s">`{&#34;type&#34;:&#34;notify&#34;,&#34;msg&#34;:&#34;你有新消息&#34;}`</span><span class="p">))</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">// 广播</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">client</span><span class="p">.</span><span class="nf">SendToAll</span><span class="p">([]</span><span class="nb">byte</span><span class="p">(</span><span class="s">`{&#34;type&#34;:&#34;announcement&#34;,&#34;msg&#34;:&#34;系统维护通知&#34;}`</span><span class="p">))</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">// 查询在线人数</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">count</span><span class="p">,</span><span class="w"> </span><span class="nx">_</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nf">GetAllClientCount</span><span class="p">()</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;在线人数:&#34;</span><span class="p">,</span><span class="w"> </span><span class="nx">count</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">// 判断是否在线</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">online</span><span class="p">,</span><span class="w"> </span><span class="nx">_</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nf">IsOnline</span><span class="p">(</span><span class="s">&#34;某个client_id&#34;</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;在线:&#34;</span><span class="p">,</span><span class="w"> </span><span class="nx">online</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">// 踢出</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">client</span><span class="p">.</span><span class="nf">CloseClient</span><span class="p">(</span><span class="s">&#34;某个client_id&#34;</span><span class="p">,</span><span class="w"> </span><span class="p">[]</span><span class="nb">byte</span><span class="p">(</span><span class="s">&#34;你被踢出了&#34;</span><span class="p">))</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">// UID/Group 操作</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">client</span><span class="p">.</span><span class="nf">BindUID</span><span class="p">(</span><span class="s">&#34;某个client_id&#34;</span><span class="p">,</span><span class="w"> </span><span class="s">&#34;user_200&#34;</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">client</span><span class="p">.</span><span class="nf">JoinGroup</span><span class="p">(</span><span class="s">&#34;某个client_id&#34;</span><span class="p">,</span><span class="w"> </span><span class="s">&#34;room_5&#34;</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">client</span><span class="p">.</span><span class="nf">SendToGroup</span><span class="p">(</span><span class="s">&#34;room_5&#34;</span><span class="p">,</span><span class="w"> </span><span class="p">[]</span><span class="nb">byte</span><span class="p">(</span><span class="s">`{&#34;msg&#34;:&#34;hello room&#34;}`</span><span class="p">))</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="p">}</span><span class="w">
+</span></span></span></code></pre><h3 id="gatewaysdk-vs-gateway-api">GatewaySDK vs gateway_api</h3>
+<table>
+<thead>
+<tr>
+<th>特性</th>
+<th><code>gateway_api</code></th>
+<th><code>GatewaySDK</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>使用位置</strong></td>
+<td>Worker 回调内部</td>
+<td>任意外部 Go 进程</td>
+</tr>
+<tr>
+<td><strong>连接方式</strong></td>
+<td>复用 Worker 已有连接</td>
+<td>自建连接池</td>
+</tr>
+<tr>
+<td><strong>发现 Gateway</strong></td>
+<td>Worker 内部地址表</td>
+<td>连接 Register 查询</td>
+</tr>
+<tr>
+<td><strong>适用场景</strong></td>
+<td>事件响应</td>
+<td>HTTP推送、定时任务、管理操作</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="api-">API 参考</h2>
+<h3 id="heading-16">消息发送</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SendToClient(clientID, message)</code></td>
+<td>向指定客户端发送</td>
+</tr>
+<tr>
+<td><code>SendToAll(message)</code></td>
+<td>广播给所有在线客户端</td>
+</tr>
+<tr>
+<td><code>SendToUID(uid, message)</code></td>
+<td>向指定 UID 发送</td>
+</tr>
+<tr>
+<td><code>SendToGroup(group, message)</code></td>
+<td>向指定分组广播</td>
+</tr>
+</tbody>
+</table>
+<h3 id="uid-">UID 操作</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BindUID(clientID, uid)</code></td>
+<td>绑定（一个 uid 可绑多个 client_id）</td>
+</tr>
+<tr>
+<td><code>UnbindUID(clientID, uid)</code></td>
+<td>解绑</td>
+</tr>
+</tbody>
+</table>
+<h3 id="group-">Group 操作</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>JoinGroup(clientID, group)</code></td>
+<td>加入分组</td>
+</tr>
+<tr>
+<td><code>LeaveGroup(clientID, group)</code></td>
+<td>离开分组</td>
+</tr>
+<tr>
+<td><code>Ungroup(group)</code></td>
+<td>解散分组</td>
+</tr>
+</tbody>
+</table>
+<h3 id="session-">Session 操作</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SetSession(clientID, session)</code></td>
+<td>覆盖 session</td>
+</tr>
+<tr>
+<td><code>UpdateSession(clientID, session)</code></td>
+<td>合并 session</td>
+</tr>
+</tbody>
+</table>
+<h3 id="heading-17">连接管理</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CloseClient(clientID, message)</code></td>
+<td>踢出（先发消息再断开）</td>
+</tr>
+<tr>
+<td><code>DestroyClient(clientID)</code></td>
+<td>直接销毁</td>
+</tr>
+</tbody>
+</table>
+<h3 id="gatewaysdk--gateway-api-">查询类（GatewaySDK 和 gateway_api 均可用）</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>IsOnline(clientID)</code></td>
+<td>判断 client_id 是否在线</td>
+</tr>
+<tr>
+<td><code>IsUidOnline(uid)</code></td>
+<td>判断 uid 是否在线</td>
+</tr>
+<tr>
+<td><code>GetAllClientCount()</code></td>
+<td>获取在线连接总数</td>
+</tr>
+<tr>
+<td><code>GetClientCountByGroup(group)</code></td>
+<td>获取分组在线连接数</td>
+</tr>
+<tr>
+<td><code>GetSession(clientID)</code></td>
+<td>获取 session</td>
+</tr>
+<tr>
+<td><code>GetAllClientSessions()</code></td>
+<td>所有客户端 session</td>
+</tr>
+<tr>
+<td><code>GetClientSessionsByGroup(group)</code></td>
+<td>分组成员 session</td>
+</tr>
+<tr>
+<td><code>GetAllClientIdList()</code></td>
+<td>所有在线 client_id 列表</td>
+</tr>
+<tr>
+<td><code>GetClientIdListByGroup(group)</code></td>
+<td>分组成员 client_id 列表</td>
+</tr>
+<tr>
+<td><code>GetClientIdByUid(uid)</code></td>
+<td>获取 uid 绑定的 client_id</td>
+</tr>
+<tr>
+<td><code>GetUidByClientId(clientID)</code></td>
+<td>通过 client_id 获取 uid</td>
+</tr>
+<tr>
+<td><code>GetAllUidList()</code></td>
+<td>全局在线 uid 列表</td>
+</tr>
+<tr>
+<td><code>GetAllUidCount()</code></td>
+<td>全局在线 uid 数量</td>
+</tr>
+<tr>
+<td><code>GetUidListByGroup(group)</code></td>
+<td>分组在线 uid 列表</td>
+</tr>
+<tr>
+<td><code>GetAllGroupIdList()</code></td>
+<td>所有在线分组 ID 列表</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>完整 API 和用法示例见 <a href="gateway-sdk.html">GatewaySDK SDK 文档</a></p>
+</blockquote>
+<hr>
+<h2 id="heading-18">分布式部署</h2>
+<h3 id="heading-19">单机部署</h3>
+<pre class="chroma"><code><span class="line"><span class="cl">./register  -listen <span class="s2">&#34;text://0.0.0.0:51234&#34;</span> -key <span class="s2">&#34;xxx&#34;</span>
+</span></span><span class="line"><span class="cl">./gateway   -listen <span class="s2">&#34;ws://0.0.0.0:7272&#34;</span> -key <span class="s2">&#34;xxx&#34;</span>
+</span></span><span class="line"><span class="cl">./worker    -key <span class="s2">&#34;xxx&#34;</span>
+</span></span><span class="line"><span class="cl">./dashboard -listen <span class="s2">&#34;0.0.0.0:8686&#34;</span> -key <span class="s2">&#34;xxx&#34;</span>
+</span></span></code></pre><h3 id="heading-20">多机部署</h3>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="c1"># 服务器A: Register</span>
+</span></span><span class="line"><span class="cl">./register -listen <span class="s2">&#34;text://0.0.0.0:51234&#34;</span> -key <span class="s2">&#34;xxx&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># 服务器B: Gateway</span>
+</span></span><span class="line"><span class="cl">./gateway -listen <span class="s2">&#34;ws://0.0.0.0:7272&#34;</span> -lan-ip <span class="s2">&#34;192.168.1.2&#34;</span> -key <span class="s2">&#34;xxx&#34;</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl">    -register <span class="s2">&#34;192.168.1.1:51234&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># 服务器C: Worker</span>
+</span></span><span class="line"><span class="cl">./worker -key <span class="s2">&#34;xxx&#34;</span> -register <span class="s2">&#34;192.168.1.1:51234&#34;</span>
+</span></span></code></pre><blockquote>
+<p><strong>注意</strong>：跨机部署时 Gateway 必须设置 <code>-lan-ip</code> 为本机内网 IP。</p>
+</blockquote>
+<h3 id="-register-">多 Register 高可用</h3>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="c1"># 两台 Register</span>
+</span></span><span class="line"><span class="cl">./register -listen <span class="s2">&#34;text://0.0.0.0:51234&#34;</span> -key <span class="s2">&#34;xxx&#34;</span>   <span class="c1"># 服务器A</span>
+</span></span><span class="line"><span class="cl">./register -listen <span class="s2">&#34;text://0.0.0.0:51234&#34;</span> -key <span class="s2">&#34;xxx&#34;</span>   <span class="c1"># 服务器B</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># Gateway/Worker 填多个 Register（逗号分隔）</span>
+</span></span><span class="line"><span class="cl">./gateway -listen <span class="s2">&#34;ws://0.0.0.0:7272&#34;</span> -key <span class="s2">&#34;xxx&#34;</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl">    -register <span class="s2">&#34;192.168.1.10:51234,192.168.1.11:51234&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">./worker -key <span class="s2">&#34;xxx&#34;</span> -register <span class="s2">&#34;192.168.1.10:51234,192.168.1.11:51234&#34;</span>
+</span></span></code></pre><h3 id="-gateway-">多 Gateway 实例</h3>
+<pre class="chroma"><code><span class="line"><span class="cl">./gateway -id <span class="m">0</span> -listen <span class="s2">&#34;ws://0.0.0.0:7272&#34;</span> -key <span class="s2">&#34;xxx&#34;</span>   <span class="c1"># 内部端口 54321</span>
+</span></span><span class="line"><span class="cl">./gateway -id <span class="m">1</span> -listen <span class="s2">&#34;ws://0.0.0.0:7273&#34;</span> -key <span class="s2">&#34;xxx&#34;</span>   <span class="c1"># 内部端口 54322</span>
+</span></span></code></pre><h3 id="-worker-">多 Worker 实例</h3>
+<pre class="chroma"><code><span class="line"><span class="cl">./worker -name <span class="s2">&#34;worker&#34;</span> -id <span class="m">0</span> -key <span class="s2">&#34;xxx&#34;</span>
+</span></span><span class="line"><span class="cl">./worker -name <span class="s2">&#34;worker&#34;</span> -id <span class="m">1</span> -key <span class="s2">&#34;xxx&#34;</span>
+</span></span></code></pre>
+    </div>
+</body>
+</html>
