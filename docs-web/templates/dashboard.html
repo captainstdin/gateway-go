@@ -1,18 +1,21 @@
 <style>
     :root {
         --dash-bg: #ffffff;
-        --dash-card-bg: rgba(255, 255, 255, 0.6);
-        --dash-card-border: rgba(0, 0, 0, 0.06);
+        --dash-card-bg: rgba(255, 255, 255, 0.15);
+        --dash-card-border: rgba(255, 255, 255, 0.4);
+        --dash-water-highlight: rgba(255, 255, 255, 0.9);
+        --dash-water-inner-shadow: rgba(0, 0, 0, 0.04);
+        --dash-water-outer-light: rgba(255, 255, 255, 0.7);
         --dash-text: #1d1d1f;
         --dash-text-sec: #86868b;
         --dash-list-border: rgba(0, 0, 0, 0.04);
         --dash-stat-bg: rgba(0, 113, 227, 0.08);
-        --dash-nav-bg: #fbfbfd;
-        --dash-btn-sec: #e8e8ed;
-        --dash-btn-sec-hover: #d1d1d6;
+        --dash-nav-bg: rgba(255, 255, 255, 0.15);
+        --dash-btn-sec: rgba(255, 255, 255, 0.3);
+        --dash-btn-sec-hover: rgba(255, 255, 255, 0.6);
         --dash-btn-sec-text: #1d1d1f;
-        --dash-shadow: rgba(0, 0, 0, 0.05);
-        --dash-shadow-hover: rgba(0, 113, 227, 0.15);
+        --dash-shadow: rgba(0, 0, 0, 0.08);
+        --dash-shadow-hover: rgba(0, 113, 227, 0.2);
         --dash-gradient-1: #0071e3;
         --dash-gradient-2: #42a1ff;
     }
@@ -20,18 +23,21 @@
     @media (prefers-color-scheme: dark) {
         :root {
             --dash-bg: #0d1117;
-            --dash-card-bg: rgba(22, 27, 34, 0.6);
+            --dash-card-bg: rgba(30, 30, 35, 0.25);
             --dash-card-border: rgba(255, 255, 255, 0.1);
+            --dash-water-highlight: rgba(255, 255, 255, 0.12);
+            --dash-water-inner-shadow: rgba(0, 0, 0, 0.4);
+            --dash-water-outer-light: rgba(255, 255, 255, 0.02);
             --dash-text: #c9d1d9;
             --dash-text-sec: #8b949e;
             --dash-list-border: rgba(255, 255, 255, 0.05);
             --dash-stat-bg: rgba(88, 166, 255, 0.15);
-            --dash-nav-bg: rgba(22, 27, 34, 0.4);
-            --dash-btn-sec: #21262d;
-            --dash-btn-sec-hover: #30363d;
+            --dash-nav-bg: rgba(30, 30, 35, 0.25);
+            --dash-btn-sec: rgba(255, 255, 255, 0.05);
+            --dash-btn-sec-hover: rgba(255, 255, 255, 0.1);
             --dash-btn-sec-text: #c9d1d9;
             --dash-shadow: rgba(0, 0, 0, 0.3);
-            --dash-shadow-hover: rgba(88, 166, 255, 0.25);
+            --dash-shadow-hover: rgba(88, 166, 255, 0.3);
             --dash-gradient-1: #58a6ff;
             --dash-gradient-2: #80bdff;
         }
@@ -42,9 +48,14 @@
         color: var(--dash-text);
     }
 
+    /* 强制去除 GitHub Markdown 的默认纯色背景，让黑客帝国矩阵可以穿透进来 */
+    .markdown-body {
+        background: transparent !important;
+    }
+
     .apple-header {
         text-align: center;
-        padding: 00px 0 20px;
+        padding: 0 0 12px;
     }
 
     .apple-header h1 {
@@ -78,23 +89,41 @@
     .apple-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 28px;
-        margin-top: 10px;
+        gap: 20px;
+        margin-top: 0;
     }
 
-    /* Glassmorphism Cards */
+    /* Liquid Water Drop Glassmorphism Cards */
     .apple-card {
         background: var(--dash-card-bg);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border-radius: 20px;
-        padding: 28px;
-        box-shadow: 0 8px 32px var(--dash-shadow);
+        backdrop-filter: blur(25px) saturate(180%);
+        -webkit-backdrop-filter: blur(25px) saturate(180%);
+        border-radius: 35px; /* Extremely rounded for water drop */
+        padding: 20px;
+        box-shadow: 
+            12px 12px 24px var(--dash-shadow), /* Drop shadow */
+            -8px -8px 20px var(--dash-water-outer-light), /* Ambient light edge */
+            inset 3px 3px 6px var(--dash-water-highlight), /* Strong specular reflection */
+            inset -4px -4px 10px var(--dash-water-inner-shadow); /* Deep inner shadow */
         border: 1px solid var(--dash-card-border);
         position: relative;
         z-index: 1;
-        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
         overflow: hidden;
+    }
+
+    /* Specular highlight orb (the glossy reflection of a water drop) */
+    .apple-card::after {
+        content: '';
+        position: absolute;
+        top: 4px;
+        left: 15%;
+        width: 70%;
+        height: 15%;
+        background: linear-gradient(180deg, var(--dash-water-highlight) 0%, transparent 100%);
+        border-radius: 50px;
+        opacity: 0.5;
+        pointer-events: none;
     }
 
     /* Glowing orb behind cards on hover */
@@ -107,15 +136,19 @@
         height: 200%;
         background: radial-gradient(circle, var(--dash-stat-bg) 0%, transparent 60%);
         opacity: 0;
-        transition: opacity 0.5s ease;
+        transition: opacity 0.6s ease;
         z-index: -1;
         pointer-events: none;
     }
 
     .apple-card:hover {
-        transform: translateY(-8px) scale(1.02);
-        box-shadow: 0 22px 40px var(--dash-shadow-hover);
-        border-color: var(--dash-gradient-1);
+        transform: translateY(-4px) scale(1.01);
+        box-shadow: 
+            16px 16px 32px var(--dash-shadow-hover),
+            -8px -8px 20px var(--dash-water-outer-light),
+            inset 3px 3px 6px var(--dash-water-highlight),
+            inset -4px -4px 10px var(--dash-water-inner-shadow);
+        border-color: var(--dash-card-border);
     }
 
     .apple-card:hover::before {
@@ -134,10 +167,10 @@
     }
 
     .apple-card h2 {
-        font-size: 22px;
+        font-size: 20px;
         font-weight: 700;
         margin-top: 0;
-        margin-bottom: 24px;
+        margin-bottom: 16px;
         border-bottom: none;
         color: var(--dash-text);
         display: flex;
@@ -165,7 +198,7 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 12px 0;
+        padding: 8px 0;
         border-bottom: 1px solid var(--dash-list-border);
         font-size: 15px;
         color: var(--dash-text-sec);
@@ -205,30 +238,52 @@
 
     .apple-nav-card {
         grid-column: 1 / -1;
-        background: linear-gradient(135deg, var(--dash-nav-bg), transparent);
+        background: var(--dash-nav-bg);
         text-align: center;
-        padding: 24px 32px;
+        padding: 16px 20px;
+        border-radius: 35px;
+        box-shadow: 
+            12px 12px 24px var(--dash-shadow),
+            -8px -8px 20px var(--dash-water-outer-light),
+            inset 3px 3px 6px var(--dash-water-highlight),
+            inset -4px -4px 10px var(--dash-water-inner-shadow);
+        border: 1px solid var(--dash-card-border);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .apple-nav-card::after {
+        content: '';
+        position: absolute;
+        top: 4px;
+        left: 15%;
+        width: 70%;
+        height: 15%;
+        background: linear-gradient(180deg, var(--dash-water-highlight) 0%, transparent 100%);
+        border-radius: 50px;
+        opacity: 0.3;
+        pointer-events: none;
     }
 
     .apple-nav-card h2 {
-        margin-bottom: 12px;
+        margin-bottom: 8px;
     }
 
     .apple-nav-card p {
         color: var(--dash-text-sec);
-        font-size: 15px;
-        margin-bottom: 16px;
+        font-size: 14px;
+        margin-bottom: 12px;
     }
 
     .btn-primary,
     .btn-secondary {
         display: inline-block;
-        padding: 14px 32px;
+        padding: 10px 24px;
         border-radius: 980px;
         text-decoration: none !important;
-        font-size: 15px;
+        font-size: 14px;
         font-weight: 600;
-        margin: 8px;
+        margin: 4px;
         transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         position: relative;
         overflow: hidden;
@@ -260,6 +315,8 @@
         background: var(--dash-btn-sec) !important;
         color: var(--dash-btn-sec-text) !important;
         border: 1px solid var(--dash-card-border);
+        backdrop-filter: blur(20px) saturate(200%);
+        -webkit-backdrop-filter: blur(20px) saturate(200%);
     }
 
     .btn-secondary:hover {
@@ -315,8 +372,9 @@
                 <a href="docs/README.html" class="btn-primary">快速开始</a>
                 <a href="docs/cheatsheet.html" class="btn-secondary">速查手册</a>
             </div>
-            <div style="margin-top: 16px; font-size: 13px; color: var(--dash-text-sec);">
-                <span>源代码：</span><a href="{{.GitURL}}" target="_blank" style="color: inherit; text-decoration: underline; transition: color 0.2s ease;">{{.GitURL}}</a>
+            <div style="margin-top: 12px; font-size: 12px; color: var(--dash-text-sec); line-height: 1.5;">
+                <div style="margin-bottom: 4px;"><span>源代码：</span><a href="{{.GitURL}}" target="_blank" style="color: inherit; text-decoration: underline; transition: color 0.2s ease;">{{.GitURL}}</a></div>
+                <div>&copy; 2026 Ameilika & GatewayWorker-Go Contributors. All rights reserved. | Released under the <a href="https://opensource.org/licenses/MIT" target="_blank" style="color: inherit; text-decoration: underline; transition: color 0.2s ease;">MIT License</a>.</div>
             </div>
         </div>
     </div>
