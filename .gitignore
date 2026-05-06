@@ -39,3 +39,6 @@ cmd/dashboard/dashboard
 cmd/gateway-edit/gateway-edit
 cmd/test-ws-tui/test-ws-tui
 cmd/tui-ws-chat/tui-ws-chat
+
+/docs-web/docs/*
+/docs-web/pkg/*
