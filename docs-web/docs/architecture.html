@@ -107,15 +107,87 @@
             max-width: 1024px;
             margin: 0 auto;
         }
+        .mobile-header, .backdrop {
+            display: none;
+        }
         @media (max-width: 767px) {
-            .sidebar { width: 100%; height: auto; position: relative; border-right: none; border-bottom: 1px solid var(--border-color); }
-            .content { margin-left: 0; padding: 15px; }
+            .mobile-header {
+                display: flex;
+                align-items: center;
+                height: 54px;
+                padding: 0 16px;
+                background: var(--bg-body);
+                border-bottom: 1px solid var(--border-color);
+                position: sticky;
+                top: 0;
+                z-index: 900;
+            }
+            .mobile-title {
+                font-weight: 600;
+                margin-left: 16px;
+                font-size: 16px;
+                color: var(--text-primary);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .menu-btn {
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                color: var(--text-primary);
+            }
+            .sidebar { 
+                width: 280px; 
+                height: 100vh; 
+                position: fixed; 
+                top: 0; 
+                left: 0;
+                z-index: 1000;
+                border-right: 1px solid var(--border-color);
+                transform: translateX(-100%);
+                transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            }
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            .backdrop {
+                display: block;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background: rgba(0, 0, 0, 0.4);
+                backdrop-filter: blur(4px);
+                -webkit-backdrop-filter: blur(4px);
+                z-index: 950;
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 0.3s ease;
+            }
+            .backdrop.open {
+                opacity: 1;
+                pointer-events: auto;
+            }
+            .content { margin-left: 0; padding: 16px; }
             .markdown-body { padding: 0; }
         }
     </style>
 </head>
 <body>
-    <div class="sidebar">
+    <div class="mobile-header">
+        <div class="menu-btn" id="menu-btn">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+        </div>
+        <div class="mobile-title">architecture.md - 文档</div>
+    </div>
+    <div class="backdrop" id="backdrop"></div>
+    <div class="sidebar" id="sidebar">
         <h3><a href="../index.html">主目录</a></h3><ul></ul><h3>使用文档 (docs)</h3><ul><li><a href="../docs/cheatsheet.html">cheatsheet.md</a></li><li><a href="../docs/README.html">README.md</a></li><li><a href="../docs/architecture.html">architecture.md</a></li><li><a href="../docs/usage.html">usage.md</a></li><li><a href="../docs/best-practices.html">best-practices.md</a></li><li><a href="../docs/code-usage.html">code-usage.md</a></li><li><a href="../docs/gateway-sdk.html">gateway-sdk.md</a></li><li><a href="../docs/internals.html">internals.md</a></li><li><a href="../docs/optimize2ai.html">optimize2ai.md</a></li><li><a href="../docs/php-vs-go.html">php-vs-go.md</a></li></ul><h3>包文档 (pkg)</h3><ul><li><a href="../pkg/context/README.html">pkg/context</a></li><li><a href="../pkg/crypto/README.html">pkg/crypto</a></li><li><a href="../pkg/gateway/README.html">pkg/gateway</a></li><li><a href="../pkg/gateway_api/README.html">pkg/gateway_api</a></li><li><a href="../pkg/gateway_sdk/README.html">pkg/gateway_sdk</a></li><li><a href="../pkg/protocol/README.html">pkg/protocol</a></li><li><a href="../pkg/register/README.html">pkg/register</a></li><li><a href="../pkg/worker/README.html">pkg/worker</a></li></ul>
     </div>
     <div class="content">
@@ -501,6 +573,24 @@ Client  → Gateway:   CMD_GATEWAY_CLIENT_CONNECT, body={&quot;secret_key&quot;:
     </div>
     <script>
         document.addEventListener("DOMContentLoaded", function() {
+            var menuBtn = document.getElementById('menu-btn');
+            var sidebar = document.getElementById('sidebar');
+            var backdrop = document.getElementById('backdrop');
+
+            if (menuBtn && sidebar && backdrop) {
+                menuBtn.addEventListener('click', function() {
+                    sidebar.classList.add('open');
+                    backdrop.classList.add('open');
+                    document.body.style.overflow = 'hidden';
+                });
+
+                backdrop.addEventListener('click', function() {
+                    sidebar.classList.remove('open');
+                    backdrop.classList.remove('open');
+                    document.body.style.overflow = '';
+                });
+            }
+
             var links = document.querySelectorAll('.sidebar a');
             var currentUrl = window.location.href.split('#')[0]; 
             links.forEach(function(link) {
