@@ -1,4 +1,4 @@
-# GatewayClient SDK 文档
+# GatewaySDK SDK 文档
 
 > 从任意 Go 进程（HTTP 服务、定时任务、管理后台等）向在线客户端推送消息、查询状态。
 
@@ -6,11 +6,11 @@
 
 ## 概述
 
-`gateway_client` 包是 **外部进程** 与 GatewayWorker 集群通讯的 SDK。它通过 Register 发现 Gateway 地址，建立独立的 TCP 连接池，支持所有推送、查询、管理操作。
+`gateway_sdk` 包是 **外部进程** 与 GatewayWorker 集群通讯的 SDK。它通过 Register 发现 Gateway 地址，建立独立的 TCP 连接池，支持所有推送、查询、管理操作。
 
 ### 与 gateway_api 的区别
 
-| 维度 | `gateway_api`（Worker 内部） | `gateway_client`（外部 SDK） |
+| 维度 | `gateway_api`（Worker 内部） | `gateway_sdk`（外部 SDK） |
 |---|---|---|
 | 使用位置 | Worker 的 OnMessage 等回调中 | 任意 Go 进程 |
 | 连接方式 | 复用 Worker 已有连接 | 自建连接池 + Register 发现 |
@@ -20,7 +20,7 @@
 
 ### 对应 PHP 版
 
-Go 的 `gateway_client` 包等同于 PHP 的 `GatewayClient\Gateway` 类（[GatewayClient](https://github.com/walkor/GatewayClient)），用于在 Worker 外部调用 Gateway API。
+Go 的 `gateway_sdk` 包等同于 PHP 的 `GatewaySDK\Gateway` 类（[GatewaySDK](https://github.com/walkor/GatewaySDK)），用于在 Worker 外部调用 Gateway API。
 
 ---
 
@@ -29,7 +29,7 @@ Go 的 `gateway_client` 包等同于 PHP 的 `GatewayClient\Gateway` 类（[Gate
 ### 安装
 
 ```go
-import "gatewayworker-go/pkg/gateway_client"
+import "gatewayworker-go/pkg/gateway_sdk"
 ```
 
 ### 基本用法
@@ -39,12 +39,12 @@ package main
 
 import (
     "fmt"
-    "gatewayworker-go/pkg/gateway_client"
+    "gatewayworker-go/pkg/gateway_sdk"
 )
 
 func main() {
     // 创建客户端（连接 Register 获取 Gateway 地址）
-    client := gateway_client.New(
+    client := gateway_sdk.New(
         []string{"127.0.0.1:51234"},  // Register 地址
         "my-secret-key",               // 密钥（需与集群一致）
     )
@@ -66,14 +66,14 @@ package main
 
 import (
     "encoding/json"
-    "gatewayworker-go/pkg/gateway_client"
+    "gatewayworker-go/pkg/gateway_sdk"
     "net/http"
 )
 
-var gwClient *gateway_client.GatewayClient
+var gwClient *gateway_sdk.GatewaySDK
 
 func main() {
-    gwClient = gateway_client.New(
+    gwClient = gateway_sdk.New(
         []string{"127.0.0.1:51234"}, "my-secret-key",
     )
     defer gwClient.Close()
@@ -111,7 +111,7 @@ func handleOnline(w http.ResponseWriter, r *http.Request) {
 
 ```go
 // 创建客户端
-client := gateway_client.New(registerAddrs []string, secretKey string) *GatewayClient
+client := gateway_sdk.New(registerAddrs []string, secretKey string) *GatewaySDK
 
 // 关闭所有连接
 client.Close()
@@ -200,7 +200,7 @@ client.SendToGroup("room_1", []byte(`{"type":"chat","msg":"hello room"}`))
 ## PHP vs Go 方法对照
 
 ```
-PHP GatewayClient\Gateway::         Go client.
+PHP GatewaySDK\Gateway::         Go client.
 ─────────────────────────────       ────────────────────────────
 sendToClient($cid, $msg)            SendToClient(cid, msg)
 sendToAll($msg)                     SendToAll(msg)
@@ -239,7 +239,7 @@ getAllGroupIdList()                  GetAllGroupIdList()
 
 ### 连接池
 
-GatewayClient 内置连接池，每个 Gateway 地址维护一条 TCP 连接，带 50 秒 TTL 自动刷新。
+GatewaySDK 内置连接池，每个 Gateway 地址维护一条 TCP 连接，带 50 秒 TTL 自动刷新。
 
 ### Gateway 地址发现
 

@@ -1,10 +1,10 @@
-# gateway_client 包
+# gateway_sdk 包
 
 ## 功能
 
-提供从 **外部应用**（非 Worker 进程）直接调用 Gateway API 的客户端。
+提供从 **外部应用**（非 Worker 进程）直接调用 Gateway API 的 SDK。
 
-对应 PHP 版在**非 workerman 环境**中使用 `Gateway` 类的场景（如在 HTTP 控制器、定时任务中向客户端推送消息）。
+对应 PHP 版在**非 workerman 环境**中使用 `GatewayClient\Gateway` 类的场景（如在 HTTP 控制器、定时任务中向客户端推送消息）。
 
 ## 原理
 
@@ -15,9 +15,9 @@
 │   HTTP API 服务   │ ← 收到 REST 请求
 │  (独立进程/服务)   │
 │                  │
-│  client.SendToUID("user123", msg)
+│  sdk.SendToUID("user123", msg)
 │       ↓                         
-│  GatewayClient ──→ Register ──→ 获取 Gateway 地址
+│  GatewaySDK ──→ Register ──→ 获取 Gateway 地址
 │       │                         
 │       └──→ Gateway-1 (直连 TCP)
 │       └──→ Gateway-2 (直连 TCP)
@@ -26,7 +26,7 @@
 
 与 `gateway_api` 包的区别：
 
-| | gateway_api | gateway_client |
+| | gateway_api | gateway_sdk |
 |---|---|---|
 | 运行环境 | Worker 进程内部 | 任意外部进程 |
 | Gateway 地址来源 | 通过 BusinessWorker | 自行连接 Register 获取 |
@@ -51,25 +51,34 @@
 | `UnbindUID(clientID, uid)` | 解绑 UID |
 | `JoinGroup(clientID, group)` | 加入分组 |
 | `LeaveGroup(clientID, group)` | 离开分组 |
+| `Ungroup(group)` | 解散分组 |
 | `CloseClient(clientID, message)` | 踢出客户端 |
 | `DestroyClient(clientID)` | 销毁连接 |
 | `SetSession(clientID, session)` | 设置 session |
 | `UpdateSession(clientID, session)` | 更新 session |
+| `GetSession(clientID)` | 获取 session |
 | `IsOnline(clientID)` | 判断是否在线 |
-| `GetAllClientCount()` | 获取在线总数 |
+| `IsUidOnline(uid)` | UID 是否在线 |
+| `GetAllClientCount()` | 在线总数 |
+| `GetClientCountByGroup(group)` | 分组在线数 |
+| `GetAllClientIdList()` | 全部 client_id |
+| `GetClientIdByUid(uid)` | UID → client_id |
+| `GetUidByClientId(clientID)` | client_id → UID |
+| `GetAllUidList()` | 全部在线 UID |
+| `GetAllGroupIdList()` | 全部在线分组 |
 
 ## 使用示例
 
 ```go
-client := gateway_client.New(
+sdk := gateway_sdk.New(
     []string{"127.0.0.1:1236"},  // Register 地址
     "your-secret-key",
 )
-defer client.Close()
+defer sdk.Close()
 
 // 向某个用户推送消息
-client.SendToUID("user123", []byte(`{"type":"notification","msg":"hello"}`))
+sdk.SendToUID("user123", []byte(`{"type":"notification","msg":"hello"}`))
 
 // 检查用户是否在线
-online, _ := client.IsOnline(clientID)
+online, _ := sdk.IsOnline(clientID)
 ```

@@ -224,13 +224,13 @@ Gateway::sendToUid($uid, $message);
 **Go 版**：
 
 ```go
-// 使用 gateway_client 包
-client := gateway_client.New([]string{"127.0.0.1:1236"}, "your-secret-key")
+// 使用 gateway_sdk 包
+client := gateway_sdk.New([]string{"127.0.0.1:1236"}, "your-secret-key")
 defer client.Close()
 client.SendToUID("user123", []byte(message))
 ```
 
-**区别**：PHP 版的 `Gateway` 类同时支持 Worker 内部和外部调用（自动检测环境）。Go 版将两个场景拆分为 `gateway_api`（Worker 内部）和 `gateway_client`（外部调用）两个独立包，职责更清晰。
+**区别**：PHP 版的 `Gateway` 类同时支持 Worker 内部和外部调用（自动检测环境）。Go 版将两个场景拆分为 `gateway_api`（Worker 内部）和 `gateway_sdk`（外部调用）两个独立包，职责更清晰。
 
 ---
 

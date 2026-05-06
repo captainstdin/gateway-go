@@ -3,7 +3,7 @@
 本文档面向 **使用 GatewayWorker-Go 编写业务逻辑** 的开发者，涵盖两大核心用法：
 
 1. **Worker 被动事件回调** — 在 Worker 进程中响应客户端连接/消息/断开等事件
-2. **GatewayClient 主动调用** — 从任意外部 Go 进程（HTTP 服务、定时任务等）向客户端推送消息
+2. **GatewaySDK 主动调用** — 从任意外部 Go 进程（HTTP 服务、定时任务等）向客户端推送消息
 
 ---
 
@@ -20,12 +20,12 @@
   - [OnClose](#onclose)
   - [gateway_api 函数列表](#gateway_api-函数列表)
   - [完整示例：聊天室](#完整示例聊天室)
-- [GatewayClient 主动调用](#gatewayclient-主动调用)
+- [GatewaySDK 主动调用](#gatewayclient-主动调用)
   - [创建客户端](#创建客户端)
   - [API 一览](#api-一览)
   - [完整示例：HTTP 推送服务](#完整示例http-推送服务)
   - [完整示例：管理后台踢人](#完整示例管理后台踢人)
-- [gateway_api vs GatewayClient 对比](#gateway_api-vs-gatewayclient-对比)
+- [gateway_api vs GatewaySDK 对比](#gateway_api-vs-gatewayclient-对比)
 - [常见模式](#常见模式)
 
 ---
@@ -45,7 +45,7 @@
                             │                    ▲
                     ┌───────┴──────┐              │
                     │   客户端      │         ┌────┴───────────┐
-                    │  (浏览器/App) │         │ GatewayClient  │
+                    │  (浏览器/App) │         │ GatewaySDK  │
                     └──────────────┘         │ (HTTP/定时任务)  │
                                              └────────────────┘
 ```
@@ -54,7 +54,7 @@
 
 - **被动事件**：客户端 → Gateway → Worker（触发 `OnConnect`/`OnMessage`/`OnClose` 回调）
 - **Worker 内主动推送**：Worker 回调中调用 `gateway_api.SendToXxx()` → Gateway → 客户端
-- **外部主动推送**：外部进程创建 `GatewayClient` → 连接 Register 发现 Gateway → 发送指令 → Gateway → 客户端
+- **外部主动推送**：外部进程创建 `GatewaySDK` → 连接 Register 发现 Gateway → 发送指令 → Gateway → 客户端
 
 ---
 
@@ -427,17 +427,17 @@ ws.send(JSON.stringify({ type: 'private', name: 'Alice', to: 'Bob', msg: '你好
 
 ---
 
-## GatewayClient 主动调用
+## GatewaySDK 主动调用
 
-`GatewayClient` 用于从 **Worker 外部的任意 Go 进程** 主动向客户端推送消息，无需运行在 Worker 进程内。
+`GatewaySDK` 用于从 **Worker 外部的任意 Go 进程** 主动向客户端推送消息，无需运行在 Worker 进程内。
 
 ### 创建客户端
 
 ```go
-import "gatewayworker-go/pkg/gateway_client"
+import "gatewayworker-go/pkg/gateway_sdk"
 
-// 创建 GatewayClient（自动连接 Register 发现 Gateway 地址）
-client := gateway_client.New(
+// 创建 GatewaySDK（自动连接 Register 发现 Gateway 地址）
+client := gateway_sdk.New(
     []string{"127.0.0.1:51234"},  // Register 地址（支持多个）
     "my-secret-key",              // 认证密钥（必须与 Gateway/Register 一致）
 )
@@ -495,7 +495,7 @@ err := client.CloseClient(clientID string, message []byte)
 err := client.DestroyClient(clientID string)
 ```
 
-#### 查询（仅 GatewayClient 可用）
+#### 查询（仅 GatewaySDK 可用）
 
 ```go
 // 判断客户端是否在线
@@ -505,13 +505,13 @@ online, err := client.IsOnline(clientID string)
 count, err := client.GetAllClientCount()
 ```
 
-> **注意**：`IsOnline` 和 `GetAllClientCount` 是 GatewayClient 独有的，`gateway_api` 包中没有这些方法。因为它们需要从 Gateway 查询并等待响应，而 Worker 内部的 `gateway_api` 是单向发送。
+> **注意**：`IsOnline` 和 `GetAllClientCount` 是 GatewaySDK 独有的，`gateway_api` 包中没有这些方法。因为它们需要从 Gateway 查询并等待响应，而 Worker 内部的 `gateway_api` 是单向发送。
 
 ---
 
 ### 完整示例：HTTP 推送服务
 
-在 HTTP API 中接收请求，通过 GatewayClient 向客户端推送实时通知：
+在 HTTP API 中接收请求，通过 GatewaySDK 向客户端推送实时通知：
 
 ```go
 package main
@@ -519,16 +519,16 @@ package main
 import (
     "encoding/json"
     "fmt"
-    "gatewayworker-go/pkg/gateway_client"
+    "gatewayworker-go/pkg/gateway_sdk"
     "log"
     "net/http"
 )
 
-var gwClient *gateway_client.GatewayClient
+var gwClient *gateway_sdk.GatewaySDK
 
 func main() {
-    // 创建 GatewayClient（全局复用）
-    gwClient = gateway_client.New(
+    // 创建 GatewaySDK（全局复用）
+    gwClient = gateway_sdk.New(
         []string{"127.0.0.1:51234"},
         "my-secret-key",
     )
@@ -641,12 +641,12 @@ package main
 
 import (
     "fmt"
-    "gatewayworker-go/pkg/gateway_client"
+    "gatewayworker-go/pkg/gateway_sdk"
     "log"
 )
 
 func main() {
-    client := gateway_client.New(
+    client := gateway_sdk.New(
         []string{"127.0.0.1:51234"},
         "my-secret-key",
     )
@@ -677,14 +677,14 @@ func main() {
 
 ---
 
-## gateway_api vs GatewayClient 对比
+## gateway_api vs GatewaySDK 对比
 
-| 维度 | `gateway_api` | `GatewayClient` |
+| 维度 | `gateway_api` | `GatewaySDK` |
 |------|---------------|-----------------|
 | **所在进程** | Worker 进程内部 | 任意外部 Go 进程 |
 | **使用位置** | 事件回调函数中 | HTTP Handler、定时任务、CLI 工具等 |
 | **连接方式** | 复用 Worker 已有的 Gateway 连接 | 自建连接池（连 Register → 发现 Gateway） |
-| **初始化** | `gateway_api.SetBusinessWorker(bw)` | `gateway_client.New(addrs, key)` |
+| **初始化** | `gateway_api.SetBusinessWorker(bw)` | `gateway_sdk.New(addrs, key)` |
 | **函数风格** | 包级函数，无 error 返回 | 实例方法，返回 `error` |
 | **查询能力** | ❌ 无 | ✅ `IsOnline`、`GetAllClientCount` |
 | **适用场景** | 响应客户端事件 | 主动推送、管理操作 |
@@ -692,7 +692,7 @@ func main() {
 **选择原则：**
 
 - 在 Worker 回调里处理事件 → 用 `gateway_api`
-- 在其他进程里主动推送 → 用 `GatewayClient`
+- 在其他进程里主动推送 → 用 `GatewaySDK`
 
 ---
 
@@ -750,10 +750,10 @@ gateway_api.UpdateSession(clientID, map[string]interface{}{
 
 ### 4. 定时广播
 
-配合 `GatewayClient` 在独立进程中做定时推送：
+配合 `GatewaySDK` 在独立进程中做定时推送：
 
 ```go
-client := gateway_client.New(addrs, key)
+client := gateway_sdk.New(addrs, key)
 defer client.Close()
 
 ticker := time.NewTicker(30 * time.Second)

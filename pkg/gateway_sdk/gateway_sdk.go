@@ -1,4 +1,4 @@
-package gateway_client
+package gateway_sdk
 
 import (
 	"bufio"
@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-type GatewayClient struct {
+type GatewaySDK struct {
 	RegisterAddr []string
 	SecretKey    string
 	ConnTimeout  time.Duration
@@ -31,8 +31,8 @@ type poolEntry struct {
 	createdAt time.Time
 }
 
-func New(registerAddr []string, secretKey string) *GatewayClient {
-	return &GatewayClient{
+func New(registerAddr []string, secretKey string) *GatewaySDK {
+	return &GatewaySDK{
 		RegisterAddr: registerAddr,
 		SecretKey:    secretKey,
 		ConnTimeout:  3 * time.Second,
@@ -41,7 +41,7 @@ func New(registerAddr []string, secretKey string) *GatewayClient {
 	}
 }
 
-func (c *GatewayClient) Close() {
+func (c *GatewaySDK) Close() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for _, e := range c.connPool {
@@ -50,7 +50,7 @@ func (c *GatewayClient) Close() {
 	c.connPool = make(map[string]*poolEntry)
 }
 
-func (c *GatewayClient) getGatewayAddresses() ([]string, error) {
+func (c *GatewaySDK) getGatewayAddresses() ([]string, error) {
 	// 快速路径：缓存有效直接返回
 	c.mu.Lock()
 	if time.Since(c.addrCacheTime) < time.Second && len(c.addrCache) > 0 {
@@ -101,7 +101,7 @@ func (c *GatewayClient) getGatewayAddresses() ([]string, error) {
 	return nil, fmt.Errorf("no gateway addresses available")
 }
 
-func (c *GatewayClient) getConn(addr string) (net.Conn, error) {
+func (c *GatewaySDK) getConn(addr string) (net.Conn, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -141,7 +141,7 @@ func (c *GatewayClient) getConn(addr string) (net.Conn, error) {
 	return conn, nil
 }
 
-func (c *GatewayClient) sendToGateway(addr string, gd *protocol.GatewayData) error {
+func (c *GatewaySDK) sendToGateway(addr string, gd *protocol.GatewayData) error {
 	conn, err := c.getConn(addr)
 	if err != nil {
 		return err
@@ -161,7 +161,7 @@ func (c *GatewayClient) sendToGateway(addr string, gd *protocol.GatewayData) err
 	return err
 }
 
-func (c *GatewayClient) sendAndRecv(addr string, gd *protocol.GatewayData) ([]byte, error) {
+func (c *GatewaySDK) sendAndRecv(addr string, gd *protocol.GatewayData) ([]byte, error) {
 	conn, err := c.getConn(addr)
 	if err != nil {
 		return nil, err
@@ -210,7 +210,7 @@ func (c *GatewayClient) sendAndRecv(addr string, gd *protocol.GatewayData) ([]by
 }
 
 // evictConn 从连接池中移除并关闭连接
-func (c *GatewayClient) evictConn(addr string) {
+func (c *GatewaySDK) evictConn(addr string) {
 	c.mu.Lock()
 	if e, ok := c.connPool[addr]; ok {
 		e.conn.Close()
@@ -219,7 +219,7 @@ func (c *GatewayClient) evictConn(addr string) {
 	c.mu.Unlock()
 }
 
-func (c *GatewayClient) sendToAllGateways(gd *protocol.GatewayData) error {
+func (c *GatewaySDK) sendToAllGateways(gd *protocol.GatewayData) error {
 	addrs, err := c.getGatewayAddresses()
 	if err != nil {
 		return err
@@ -236,7 +236,7 @@ func addrStr(ip uint32, port uint16) string {
 
 // ----- Public API -----
 
-func (c *GatewayClient) SendToClient(clientID string, message []byte) error {
+func (c *GatewaySDK) SendToClient(clientID string, message []byte) error {
 	ip, port, connID, err := gwctx.ClientIDToAddress(clientID)
 	if err != nil {
 		return err
@@ -249,7 +249,7 @@ func (c *GatewayClient) SendToClient(clientID string, message []byte) error {
 	return c.sendToGateway(addrStr(ip, port), gd)
 }
 
-func (c *GatewayClient) SendToAll(message []byte) error {
+func (c *GatewaySDK) SendToAll(message []byte) error {
 	gd := protocol.NewEmptyData()
 	gd.Cmd = protocol.CmdSendToAll
 	gd.Body = message
@@ -257,7 +257,7 @@ func (c *GatewayClient) SendToAll(message []byte) error {
 	return c.sendToAllGateways(gd)
 }
 
-func (c *GatewayClient) SendToUID(uid interface{}, message []byte) error {
+func (c *GatewaySDK) SendToUID(uid interface{}, message []byte) error {
 	var uids []interface{}
 	switch v := uid.(type) {
 	case []interface{}:
@@ -274,7 +274,7 @@ func (c *GatewayClient) SendToUID(uid interface{}, message []byte) error {
 	return c.sendToAllGateways(gd)
 }
 
-func (c *GatewayClient) SendToGroup(group interface{}, message []byte) error {
+func (c *GatewaySDK) SendToGroup(group interface{}, message []byte) error {
 	var groups []interface{}
 	switch v := group.(type) {
 	case []interface{}:
@@ -291,39 +291,39 @@ func (c *GatewayClient) SendToGroup(group interface{}, message []byte) error {
 	return c.sendToAllGateways(gd)
 }
 
-func (c *GatewayClient) BindUID(clientID, uid string) error {
+func (c *GatewaySDK) BindUID(clientID, uid string) error {
 	return c.sendCmdToClient(clientID, protocol.CmdBindUID, nil, uid)
 }
 
-func (c *GatewayClient) UnbindUID(clientID, uid string) error {
+func (c *GatewaySDK) UnbindUID(clientID, uid string) error {
 	return c.sendCmdToClient(clientID, protocol.CmdUnbindUID, nil, uid)
 }
 
-func (c *GatewayClient) JoinGroup(clientID, group string) error {
+func (c *GatewaySDK) JoinGroup(clientID, group string) error {
 	return c.sendCmdToClient(clientID, protocol.CmdJoinGroup, nil, group)
 }
 
-func (c *GatewayClient) LeaveGroup(clientID, group string) error {
+func (c *GatewaySDK) LeaveGroup(clientID, group string) error {
 	return c.sendCmdToClient(clientID, protocol.CmdLeaveGroup, nil, group)
 }
 
-func (c *GatewayClient) CloseClient(clientID string, message []byte) error {
+func (c *GatewaySDK) CloseClient(clientID string, message []byte) error {
 	return c.sendCmdToClient(clientID, protocol.CmdKick, message, "")
 }
 
-func (c *GatewayClient) DestroyClient(clientID string) error {
+func (c *GatewaySDK) DestroyClient(clientID string) error {
 	return c.sendCmdToClient(clientID, protocol.CmdDestroy, nil, "")
 }
 
-func (c *GatewayClient) SetSession(clientID string, session map[string]interface{}) error {
+func (c *GatewaySDK) SetSession(clientID string, session map[string]interface{}) error {
 	return c.sendCmdToClient(clientID, protocol.CmdSetSession, nil, gwctx.SessionEncode(session))
 }
 
-func (c *GatewayClient) UpdateSession(clientID string, session map[string]interface{}) error {
+func (c *GatewaySDK) UpdateSession(clientID string, session map[string]interface{}) error {
 	return c.sendCmdToClient(clientID, protocol.CmdUpdateSession, nil, gwctx.SessionEncode(session))
 }
 
-func (c *GatewayClient) IsOnline(clientID string) (bool, error) {
+func (c *GatewaySDK) IsOnline(clientID string) (bool, error) {
 	ip, port, connID, err := gwctx.ClientIDToAddress(clientID)
 	if err != nil {
 		return false, err
@@ -340,7 +340,7 @@ func (c *GatewayClient) IsOnline(clientID string) (bool, error) {
 	return v == 1, nil
 }
 
-func (c *GatewayClient) GetAllClientCount() (int, error) {
+func (c *GatewaySDK) GetAllClientCount() (int, error) {
 	gd := protocol.NewEmptyData()
 	gd.Cmd = protocol.CmdGetClientCountByGroup
 	results := c.queryAllGateways(gd)
@@ -356,7 +356,7 @@ func (c *GatewayClient) GetAllClientCount() (int, error) {
 	return total, nil
 }
 
-func (c *GatewayClient) sendCmdToClient(clientID string, cmd uint8, body []byte, extData string) error {
+func (c *GatewaySDK) sendCmdToClient(clientID string, cmd uint8, body []byte, extData string) error {
 	ip, port, connID, err := gwctx.ClientIDToAddress(clientID)
 	if err != nil {
 		return err
@@ -371,7 +371,7 @@ func (c *GatewayClient) sendCmdToClient(clientID string, cmd uint8, body []byte,
 }
 
 // queryAllGateways 向所有 Gateway 并发查询并收集结果
-func (c *GatewayClient) queryAllGateways(gd *protocol.GatewayData) []queryResult {
+func (c *GatewaySDK) queryAllGateways(gd *protocol.GatewayData) []queryResult {
 	addrs, err := c.getGatewayAddresses()
 	if err != nil || len(addrs) == 0 {
 		return nil
@@ -397,7 +397,7 @@ type queryResult struct {
 }
 
 // Ungroup 解散分组
-func (c *GatewayClient) Ungroup(group string) error {
+func (c *GatewaySDK) Ungroup(group string) error {
 	gd := protocol.NewEmptyData()
 	gd.Cmd = protocol.CmdUngroup
 	gd.ExtData = group
@@ -405,7 +405,7 @@ func (c *GatewayClient) Ungroup(group string) error {
 }
 
 // GetSession 获取指定 client_id 的 session
-func (c *GatewayClient) GetSession(clientID string) (map[string]interface{}, error) {
+func (c *GatewaySDK) GetSession(clientID string) (map[string]interface{}, error) {
 	ip, port, connID, err := gwctx.ClientIDToAddress(clientID)
 	if err != nil {
 		return nil, err
@@ -423,7 +423,7 @@ func (c *GatewayClient) GetSession(clientID string) (map[string]interface{}, err
 }
 
 // IsUidOnline 判断 uid 是否在线
-func (c *GatewayClient) IsUidOnline(uid string) (bool, error) {
+func (c *GatewaySDK) IsUidOnline(uid string) (bool, error) {
 	clients, err := c.GetClientIdByUid(uid)
 	if err != nil {
 		return false, err
@@ -432,7 +432,7 @@ func (c *GatewayClient) IsUidOnline(uid string) (bool, error) {
 }
 
 // GetClientCountByGroup 获取某个分组的在线连接数
-func (c *GatewayClient) GetClientCountByGroup(group string) (int, error) {
+func (c *GatewaySDK) GetClientCountByGroup(group string) (int, error) {
 	gd := protocol.NewEmptyData()
 	gd.Cmd = protocol.CmdGetClientCountByGroup
 	gd.ExtData = group
@@ -450,7 +450,7 @@ func (c *GatewayClient) GetClientCountByGroup(group string) (int, error) {
 }
 
 // GetAllClientSessions 获取所有在线 client 的 session
-func (c *GatewayClient) GetAllClientSessions() (map[string]map[string]interface{}, error) {
+func (c *GatewaySDK) GetAllClientSessions() (map[string]map[string]interface{}, error) {
 	gd := protocol.NewEmptyData()
 	gd.Cmd = protocol.CmdGetAllClientSessions
 	results := c.queryAllGateways(gd)
@@ -477,7 +477,7 @@ func (c *GatewayClient) GetAllClientSessions() (map[string]map[string]interface{
 }
 
 // GetClientSessionsByGroup 获取某个分组成员的 session
-func (c *GatewayClient) GetClientSessionsByGroup(group string) (map[string]map[string]interface{}, error) {
+func (c *GatewaySDK) GetClientSessionsByGroup(group string) (map[string]map[string]interface{}, error) {
 	gd := protocol.NewEmptyData()
 	gd.Cmd = protocol.CmdGetClientSessionsByGroup
 	gd.ExtData = group
@@ -505,17 +505,17 @@ func (c *GatewayClient) GetClientSessionsByGroup(group string) (map[string]map[s
 }
 
 // GetAllClientIdList 获取所有在线 client_id 列表
-func (c *GatewayClient) GetAllClientIdList() ([]string, error) {
+func (c *GatewaySDK) GetAllClientIdList() ([]string, error) {
 	return c.selectClientIds(nil)
 }
 
 // GetClientIdListByGroup 获取某个分组的在线 client_id 列表
-func (c *GatewayClient) GetClientIdListByGroup(group string) ([]string, error) {
+func (c *GatewaySDK) GetClientIdListByGroup(group string) ([]string, error) {
 	return c.selectClientIds(map[string]interface{}{"groups": []string{group}})
 }
 
 // GetClientIdByUid 获取 uid 绑定的 client_id 列表
-func (c *GatewayClient) GetClientIdByUid(uid string) ([]string, error) {
+func (c *GatewaySDK) GetClientIdByUid(uid string) ([]string, error) {
 	gd := protocol.NewEmptyData()
 	gd.Cmd = protocol.CmdGetClientIDByUID
 	gd.ExtData = uid
@@ -538,7 +538,7 @@ func (c *GatewayClient) GetClientIdByUid(uid string) ([]string, error) {
 }
 
 // GetAllGroupIdList 获取所有在线分组 ID 列表
-func (c *GatewayClient) GetAllGroupIdList() ([]string, error) {
+func (c *GatewaySDK) GetAllGroupIdList() ([]string, error) {
 	gd := protocol.NewEmptyData()
 	gd.Cmd = protocol.CmdGetGroupIDList
 	results := c.queryAllGateways(gd)
@@ -563,7 +563,7 @@ func (c *GatewayClient) GetAllGroupIdList() ([]string, error) {
 }
 
 // GetUidByClientId 通过 client_id 获取 uid
-func (c *GatewayClient) GetUidByClientId(clientID string) (string, error) {
+func (c *GatewaySDK) GetUidByClientId(clientID string) (string, error) {
 	data, err := c.selectQuery([]string{"uid"}, map[string]interface{}{"client_id": []string{clientID}})
 	if err != nil {
 		return "", err
@@ -577,7 +577,7 @@ func (c *GatewayClient) GetUidByClientId(clientID string) (string, error) {
 }
 
 // GetUidListByGroup 获取某个分组在线 uid 列表
-func (c *GatewayClient) GetUidListByGroup(group string) ([]string, error) {
+func (c *GatewaySDK) GetUidListByGroup(group string) ([]string, error) {
 	data, err := c.selectQuery([]string{"uid"}, map[string]interface{}{"groups": []string{group}})
 	if err != nil {
 		return nil, err
@@ -596,7 +596,7 @@ func (c *GatewayClient) GetUidListByGroup(group string) ([]string, error) {
 }
 
 // GetAllUidList 获取全局在线 uid 列表
-func (c *GatewayClient) GetAllUidList() ([]string, error) {
+func (c *GatewaySDK) GetAllUidList() ([]string, error) {
 	data, err := c.selectQuery([]string{"uid"}, nil)
 	if err != nil {
 		return nil, err
@@ -615,20 +615,20 @@ func (c *GatewayClient) GetAllUidList() ([]string, error) {
 }
 
 // GetAllUidCount 获取全局在线 uid 数量
-func (c *GatewayClient) GetAllUidCount() (int, error) {
+func (c *GatewaySDK) GetAllUidCount() (int, error) {
 	uids, err := c.GetAllUidList()
 	return len(uids), err
 }
 
 // GetUidCountByGroup 获取分组在线 uid 数量
-func (c *GatewayClient) GetUidCountByGroup(group string) (int, error) {
+func (c *GatewaySDK) GetUidCountByGroup(group string) (int, error) {
 	uids, err := c.GetUidListByGroup(group)
 	return len(uids), err
 }
 
 // ----- 内部 select 查询 -----
 
-func (c *GatewayClient) selectQuery(fields []string, where map[string]interface{}) (map[string]map[string]interface{}, error) {
+func (c *GatewaySDK) selectQuery(fields []string, where map[string]interface{}) (map[string]map[string]interface{}, error) {
 	gd := protocol.NewEmptyData()
 	gd.Cmd = protocol.CmdSelect
 	extMap := map[string]interface{}{"fields": fields, "where": where}
@@ -657,7 +657,7 @@ func (c *GatewayClient) selectQuery(fields []string, where map[string]interface{
 	return allData, nil
 }
 
-func (c *GatewayClient) selectClientIds(where map[string]interface{}) ([]string, error) {
+func (c *GatewaySDK) selectClientIds(where map[string]interface{}) ([]string, error) {
 	data, err := c.selectQuery([]string{"uid"}, where)
 	if err != nil {
 		return nil, err

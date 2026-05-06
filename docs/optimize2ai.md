@@ -186,9 +186,9 @@
 
 ---
 
-### 🟡 #12 gateway_client 认证加密忽略错误
+### 🟡 #12 gateway_sdk 认证加密忽略错误
 
-**文件**: `pkg/gateway_client/gateway_client.go` L117
+**文件**: `pkg/gateway_sdk/gateway_sdk.go` L117
 
 **问题**: `encrypted, _ := crypto.Encrypt(...)` 忽略了加密错误，如果 aesKey 有问题会发送空数据。
 
@@ -203,9 +203,9 @@
 
 ---
 
-### 🟢 #13 gateway_client 3 处 append 优化
+### 🟢 #13 gateway_sdk 3 处 append 优化
 
-**文件**: `pkg/gateway_client/gateway_client.go` — `getConn`, `sendToGateway`, `sendAndRecv`
+**文件**: `pkg/gateway_sdk/gateway_sdk.go` — `getConn`, `sendToGateway`, `sendAndRecv`
 
 与 #5 相同的 `append(lenBuf, encrypted...)` 模式，统一改为 `make+copy`。
 
@@ -217,7 +217,7 @@
 |---|---|---|
 | 🔴 必修（会导致 crash/卡死） | **5** | 并发 map panic、竞态初始化、锁下 I/O 阻塞 |
 | 🟡 应修（防御性 / 内存安全） | **5** | 类型断言、nil 检查、append 污染、内存泄漏、错误处理 |
-| 🟢 优化（性能提升） | **3** | 热路径分配、心跳复用、gateway_client 一致性 |
+| 🟢 优化（性能提升） | **3** | 热路径分配、心跳复用、gateway_sdk 一致性 |
 | **总计** | **13** | |
 
 ## 未改动的项（不值得改）

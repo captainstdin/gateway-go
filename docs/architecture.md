@@ -13,8 +13,8 @@ GatewayWorker-Go 采用 **Gateway + Worker 分离** 的架构，将网络 IO 与
              ┌────────────┘      │      └────────────────┐
              ▼                   │注册/发现               ▼
 ┌────────────────────────┐       │        ┌──────────────────────┐
-│        Gateway         │       │        │    GatewayClient     │
-│  (网关，管理客户端连接)  │       │        │    (独立推送SDK)      │
+│        Gateway         │       │        │     GatewaySDK       │
+│  (网关，管理客户端连接)  │       │        │    (独立推送 SDK)     │
 └──┬──────────────────┬──┘       │        └──────────┬───────────┘
    │                  │          │                   │
    │ WebSocket/TCP    │ GatewayProtocol+AES          │ GatewayProtocol+AES
@@ -26,9 +26,9 @@ GatewayWorker-Go 采用 **Gateway + Worker 分离** 的架构，将网络 IO 与
 └────────┘    └──────────────────────┘   认证方式不同)
 ```
 
-> **GatewayClient 本质上是一个"主动型 BusinessWorker"**：它和 BusinessWorker 一样连接 Register 发现 Gateway 地址，然后连接 Gateway 的内部命令端口发送指令。区别在于：
+> **GatewaySDK 本质上是一个"主动型 BusinessWorker"**：它和 BusinessWorker 一样连接 Register 发现 Gateway 地址，然后连接 Gateway 的内部命令端口发送指令。区别在于：
 > - BusinessWorker 使用 `CMD_WORKER_CONNECT` 认证，**被动**接收 Gateway 转发的客户端事件
-> - GatewayClient 使用 `CMD_GATEWAY_CLIENT_CONNECT` 认证，**主动**向 Gateway 发送推送/查询等指令
+> - GatewaySDK 使用 `CMD_GATEWAY_CLIENT_CONNECT` 认证，**主动**向 Gateway 发送推送/查询等指令
 
 ---
 
@@ -116,9 +116,9 @@ Gateway 维护两类连接：
 - 为每个客户端分配全局唯一的 `connection_id`（uint32，最大约 42.9 亿）
 - 维护 session、UID 绑定、Group 分组等状态
 
-**对内连接（Worker/GatewayClient）**：
+**对内连接（Worker/GatewaySDK）**：
 - 监听内部 TCP 端口（`lanIP:startPort+instanceID`），使用 GatewayProtocol + AES
-- 接收 Worker/GatewayClient 的连接和指令（发消息、踢人、绑定UID、加入Group 等 30+ 种命令）
+- 接收 Worker/GatewaySDK 的连接和指令（发消息、踢人、绑定UID、加入Group 等 30+ 种命令）
 
 **路由策略**：
 - `least_connections`（默认）：将客户端路由到连接数最少的 Worker，自动负载均衡
@@ -134,7 +134,7 @@ Gateway 维护两类连接：
 - 每 3 秒向 Register 上报处理统计（`worker_stats` 事件）
 - 与 Gateway 或 Register 断线后自动重连
 
-### GatewayClient（独立推送 SDK）
+### GatewaySDK（独立推送 SDK）
 
 - 不依赖 Worker 进程，可从任意 Go 程序使用
 - 连接 Register 发现 Gateway 地址（带 1 秒缓存）
@@ -207,7 +207,7 @@ Gateway 与 Worker 间的通讯协议，28 字节固定头部 + 变长数据，�
 | CMD_UNGROUP | 27 | W→G | 解散分组 |
 | CMD_WORKER_CONNECT | 200 | W→G | Worker 认证 |
 | CMD_PING | 201 | 双向 | 心跳 |
-| CMD_GATEWAY_CLIENT_CONNECT | 202 | C→G | GatewayClient 认证 |
+| CMD_GATEWAY_CLIENT_CONNECT | 202 | C→G | GatewaySDK 认证 |
 | CMD_ON_WEBSOCKET_CONNECT | 205 | G→W | WS 握手完成 |
 
 ### Client ID 编码

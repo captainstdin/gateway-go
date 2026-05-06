@@ -323,9 +323,9 @@ func main() {
 
 ---
 
-## GatewayClient SDK
+## GatewaySDK SDK
 
-用于从 **Worker 外部的其他进程** 向客户端推送消息。完整 API 参考见 [GatewayClient SDK 文档](gateway-client-sdk.md)。
+用于从 **Worker 外部的其他进程** 向客户端推送消息。完整 API 参考见 [GatewaySDK SDK 文档](gateway-sdk.md)。
 
 ### 典型场景
 
@@ -340,11 +340,11 @@ package main
 
 import (
     "fmt"
-    "gatewayworker-go/pkg/gateway_client"
+    "gatewayworker-go/pkg/gateway_sdk"
 )
 
 func main() {
-    client := gateway_client.New(
+    client := gateway_sdk.New(
         []string{"127.0.0.1:51234"},
         "my-secret-key",
     )
@@ -374,9 +374,9 @@ func main() {
 }
 ```
 
-### GatewayClient vs gateway_api
+### GatewaySDK vs gateway_api
 
-| 特性 | `gateway_api` | `GatewayClient` |
+| 特性 | `gateway_api` | `GatewaySDK` |
 |------|---------------|-----------------|
 | **使用位置** | Worker 回调内部 | 任意外部 Go 进程 |
 | **连接方式** | 复用 Worker 已有连接 | 自建连接池 |
@@ -425,7 +425,7 @@ func main() {
 | `CloseClient(clientID, message)` | 踢出（先发消息再断开） |
 | `DestroyClient(clientID)` | 直接销毁 |
 
-### 查询类（GatewayClient 和 gateway_api 均可用）
+### 查询类（GatewaySDK 和 gateway_api 均可用）
 
 | 方法 | 说明 |
 |------|------|
@@ -445,7 +445,7 @@ func main() {
 | `GetUidListByGroup(group)` | 分组在线 uid 列表 |
 | `GetAllGroupIdList()` | 所有在线分组 ID 列表 |
 
-> 完整 API 和用法示例见 [GatewayClient SDK 文档](gateway-client-sdk.md)
+> 完整 API 和用法示例见 [GatewaySDK SDK 文档](gateway-sdk.md)
 
 
 ---

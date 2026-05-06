@@ -20,7 +20,7 @@
 | 位置 | 限制 | 超限行为 | 涉及文件 |
 |---|---|---|---|
 | ① **客户端协议** | **10MB** | `Input()` 返回 -1，连接被关闭 | `protocol_length_field.go:16` |
-| ② **内部通讯** | **50MB** | `readEncryptedPacket` 返回错误，Worker 断开重连 | `gateway.go`, `business_worker.go`, `gateway_conn.go`, `gateway_client.go` |
+| ② **内部通讯** | **50MB** | `readEncryptedPacket` 返回错误，Worker 断开重连 | `gateway.go`, `business_worker.go`, `gateway_conn.go`, `gateway_sdk.go` |
 | ③ **Register 通讯** | **64KB** | `bufio.Scanner` 丢弃超长行 | `register.go:104`, `business_worker.go:156` |
 
 ### 常量定义位置
@@ -29,7 +29,7 @@
 
 | 常量 | 值 | 定义位置 | 影响范围 |
 |---|---|---|---|
-| `protocol.MaxEncryptedPacketSize` | 50MB | `pkg/protocol/gateway_protocol.go` | Gateway、Worker、GatewayClient、gateway_api 四个组件的内部加密通讯 |
+| `protocol.MaxEncryptedPacketSize` | 50MB | `pkg/protocol/gateway_protocol.go` | Gateway、Worker、GatewaySDK、gateway_api 四个组件的内部加密通讯 |
 | `maxPacketSize` | 10MB | `pkg/gateway/protocol_length_field.go` | 面向客户端的 TCP/Frame/Text 协议层 |
 
 > **注意**：这两层限制是独立的。客户端 10MB 限制保护 Gateway 不被外部恶意大包攻击；内部 50MB 限制保护组件间通讯不因异常数据 OOM。内部限制大于客户端限制是因为内部包含额外的协议头、Session 数据和 AES 加密填充。
