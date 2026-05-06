@@ -329,13 +329,17 @@
         grid-column: 1 / -1;
         background: linear-gradient(135deg, var(--dash-nav-bg), transparent);
         text-align: center;
-        padding: 45px;
+        padding: 24px 32px;
+    }
+
+    .apple-nav-card h2 {
+        margin-bottom: 12px;
     }
 
     .apple-nav-card p {
         color: var(--dash-text-sec);
-        font-size: 16px;
-        margin-bottom: 24px;
+        font-size: 15px;
+        margin-bottom: 16px;
     }
 
     .btn-primary,
@@ -389,7 +393,7 @@
 
 <div class="apple-dashboard">
     <div class="apple-header">
-        <h1>GatewayWorker-Go</h1>
+        <h1 id="typewriter-title" style="min-height: 58px;"></h1>
         <p style="line-height: 1.6;">
             🚀 <strong>PHP Workerman</strong> 的 <strong>Google Golang</strong> 语言复刻加强版<br>
             兼具经典架构的易用性与 Go 语言的高并发性能，打造极致体验的分布式实时 <strong style="color: red;">加密通讯</strong> 框架
@@ -401,8 +405,8 @@
             <h2><span class="icon-bounce" style="font-size: 26px;">📊</span> 版本与状态</h2>
             <ul class="apple-stat-list">
                 <li><span>当前分支</span> <span class="apple-stat-value">main</span></li>
-                <li><span>最新提交</span> <span class="apple-stat-value">f4912b9</span></li>
-                <li><span>更新时间</span> <span class="apple-stat-value">2026-05-06 23:53:57</span></li>
+                <li><span>最新提交</span> <span class="apple-stat-value">12b20a4</span></li>
+                <li><span>更新时间</span> <span class="apple-stat-value">2026-05-07 00:32:22</span></li>
             </ul>
         </div>
 
@@ -410,7 +414,7 @@
             <h2><span class="icon-bounce" style="font-size: 26px;">📈</span> 代码统计</h2>
             <ul class="apple-stat-list">
                 <li><span>Go 文件数</span> <span class="apple-stat-value">24 个</span></li>
-                <li><span>代码总行数</span> <span class="apple-stat-value">5738 行</span></li>
+                <li><span>代码总行数</span> <span class="apple-stat-value">5780 行</span></li>
                 <li><span>开发语言</span> <span class="apple-stat-value">Google Go 1.22</span></li>
             </ul>
         </div>
@@ -433,9 +437,107 @@
                 <a href="docs/README.html" class="btn-primary">快速开始</a>
                 <a href="docs/cheatsheet.html" class="btn-secondary">速查手册</a>
             </div>
+            <div style="margin-top: 16px; font-size: 13px; color: var(--dash-text-sec);">
+                <span>源代码：</span><a href="https://adminv.myds.me/a/gatewayworker-go" target="_blank" style="color: inherit; text-decoration: underline; transition: color 0.2s ease;">https://adminv.myds.me/a/gatewayworker-go</a>
+            </div>
         </div>
     </div>
 </div>
+
+<canvas id="matrix-bg"></canvas>
+
+<style>
+#matrix-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: -2;
+    opacity: 0.3;
+    filter: blur(0.8px);
+    pointer-events: none;
+}
+@media (prefers-color-scheme: dark) {
+    #matrix-bg {
+        opacity: 0.45;
+    }
+}
+</style>
+
+<script>
+    const canvas = document.getElementById('matrix-bg');
+    const ctx = canvas.getContext('2d');
+
+    let width = canvas.width = window.innerWidth;
+    let height = canvas.height = window.innerHeight;
+
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*()';
+    const charArray = characters.split('');
+
+    let fontSize = 14;
+    let columns = Math.floor(width / fontSize);
+    let drops = [];
+    for(let x = 0; x < columns; x++) drops[x] = 1;
+
+    function draw() {
+        const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        
+        ctx.fillStyle = isDark ? 'rgba(13, 17, 23, 0.08)' : 'rgba(255, 255, 255, 0.08)';
+        ctx.fillRect(0, 0, width, height);
+
+        
+        ctx.fillStyle = isDark ? 'rgba(88, 166, 255, 0.8)' : 'rgba(0, 113, 227, 0.8)';
+        ctx.font = fontSize + 'px monospace';
+
+        for(let i = 0; i < drops.length; i++) {
+            const text = charArray[Math.floor(Math.random() * charArray.length)];
+            ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+            if(drops[i] * fontSize > height && Math.random() > 0.975) {
+                drops[i] = 0;
+            }
+            drops[i]++;
+        }
+    }
+
+    window.addEventListener('resize', () => {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+        columns = Math.floor(width / fontSize);
+        drops = [];
+        for(let x = 0; x < columns; x++) drops[x] = 1;
+    });
+
+    setInterval(draw, 35);
+
+    
+    const titleEl = document.getElementById('typewriter-title');
+    const textToType = 'GatewayWorker-Go';
+    let charIndex = 0;
+    let isDeleting = false;
+    
+    function typeWriter() {
+        if (!isDeleting && charIndex <= textToType.length) {
+            titleEl.textContent = textToType.substring(0, charIndex) + (charIndex < textToType.length ? '_' : '');
+            charIndex++;
+            setTimeout(typeWriter, 150);
+        } else if (isDeleting && charIndex >= 0) {
+            titleEl.textContent = textToType.substring(0, charIndex) + '_';
+            charIndex--;
+            setTimeout(typeWriter, 80);
+        } else if (charIndex > textToType.length) {
+            titleEl.textContent = textToType; 
+            isDeleting = true;
+            setTimeout(typeWriter, 3000); 
+        } else if (charIndex < 0) {
+            isDeleting = false;
+            charIndex = 0;
+            setTimeout(typeWriter, 500);
+        }
+    }
+    setTimeout(typeWriter, 500);
+</script>
         </div>
     </div>
     <script>

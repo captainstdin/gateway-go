@@ -192,6 +192,7 @@ func generateIndexHTML(outDir, navHTML string) {
 	hash, _ := exec.Command("git", "rev-parse", "--short", "HEAD").Output()
 	branch, _ := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD").Output()
 	date, _ := exec.Command("git", "log", "-1", "--format=%cd", "--date=format:%Y-%m-%d %H:%M:%S").Output()
+	gitURL := getGitRemoteURL()
 	
 	// 统计代码行数
 	var totalLines int
@@ -221,12 +222,14 @@ func generateIndexHTML(outDir, navHTML string) {
 		Branch     string
 		Hash       string
 		Date       string
+		GitURL     string
 		FileCount  int
 		TotalLines int
 	}{
 		Branch:     strings.TrimSpace(string(branch)),
 		Hash:       strings.TrimSpace(string(hash)),
 		Date:       strings.TrimSpace(string(date)),
+		GitURL:     gitURL,
 		FileCount:  fileCount,
 		TotalLines: totalLines,
 	}
@@ -358,4 +361,43 @@ func wrapHTML(title, nav, content, resourcePrefix string) string {
 	}
 
 	return buf.String()
+}
+
+func getGitRemoteURL() string {
+	cmd := exec.Command("git", "remote", "-v")
+	out, err := cmd.Output()
+	if err != nil {
+		return "#"
+	}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(lines) == 0 || lines[0] == "" {
+		return "#"
+	}
+	parts := strings.Fields(lines[0])
+	if len(parts) >= 2 {
+		url := parts[1]
+		if strings.HasPrefix(url, "ssh://") {
+			url = strings.TrimPrefix(url, "ssh://")
+			if strings.Contains(url, "@") {
+				url = strings.SplitN(url, "@", 2)[1]
+			}
+			slashIdx := strings.Index(url, "/")
+			if slashIdx != -1 {
+				hostPart := url[:slashIdx]
+				if colonIdx := strings.Index(hostPart, ":"); colonIdx != -1 {
+					hostPart = hostPart[:colonIdx]
+				}
+				url = hostPart + url[slashIdx:]
+			}
+			url = "https://" + url
+		} else if strings.HasPrefix(url, "git@") {
+			url = strings.Replace(url, ":", "/", 1)
+			url = strings.Replace(url, "git@", "https://", 1)
+		}
+		if strings.HasSuffix(url, ".git") {
+			url = strings.TrimSuffix(url, ".git")
+		}
+		return url
+	}
+	return "#"
 }
