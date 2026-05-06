@@ -16,6 +16,9 @@ func SetBusinessWorker(w *worker.BusinessWorker) { bw = w }
 
 // sendCmd 向指定客户端发送命令（fire-and-forget）
 func sendCmd(clientID string, cmd uint8, message []byte, extData string) {
+	if bw == nil {
+		return
+	}
 	localIP, localPort, connID, err := gwctx.ClientIDToAddress(clientID)
 	if err != nil {
 		return
@@ -31,6 +34,9 @@ func sendCmd(clientID string, cmd uint8, message []byte, extData string) {
 
 // sendCmdToAll 向所有 gateway 发送命令（fire-and-forget）
 func sendCmdToAll(cmd uint8, message []byte, extData string) {
+	if bw == nil {
+		return
+	}
 	gd := protocol.NewEmptyData()
 	gd.Cmd = cmd
 	gd.Body = message

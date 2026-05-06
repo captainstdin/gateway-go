@@ -114,10 +114,15 @@ func (c *GatewayClient) getConn(addr string) (net.Conn, error) {
 	authData.Body = body
 	authData.Flag = protocol.FlagBodyIsScalar
 
-	encrypted, _ := crypto.Encrypt(protocol.Encode(authData), c.aesKey)
-	lenBuf := make([]byte, 4)
-	binary.BigEndian.PutUint32(lenBuf, uint32(len(encrypted)))
-	conn.Write(append(lenBuf, encrypted...))
+	encrypted, err := crypto.Encrypt(protocol.Encode(authData), c.aesKey)
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("encrypt auth failed: %w", err)
+	}
+	buf := make([]byte, 4+len(encrypted))
+	binary.BigEndian.PutUint32(buf[:4], uint32(len(encrypted)))
+	copy(buf[4:], encrypted)
+	conn.Write(buf)
 
 	c.connPool[addr] = &poolEntry{conn: conn, createdAt: time.Now()}
 	return conn, nil
@@ -133,9 +138,10 @@ func (c *GatewayClient) sendToGateway(addr string, gd *protocol.GatewayData) err
 	if err != nil {
 		return err
 	}
-	lenBuf := make([]byte, 4)
-	binary.BigEndian.PutUint32(lenBuf, uint32(len(encrypted)))
-	_, err = conn.Write(append(lenBuf, encrypted...))
+	buf := make([]byte, 4+len(encrypted))
+	binary.BigEndian.PutUint32(buf[:4], uint32(len(encrypted)))
+	copy(buf[4:], encrypted)
+	_, err = conn.Write(buf)
 	if err != nil {
 		c.mu.Lock()
 		delete(c.connPool, addr)
@@ -154,9 +160,10 @@ func (c *GatewayClient) sendAndRecv(addr string, gd *protocol.GatewayData) ([]by
 	if err != nil {
 		return nil, err
 	}
-	lenBuf := make([]byte, 4)
-	binary.BigEndian.PutUint32(lenBuf, uint32(len(encrypted)))
-	if _, err = conn.Write(append(lenBuf, encrypted...)); err != nil {
+	buf := make([]byte, 4+len(encrypted))
+	binary.BigEndian.PutUint32(buf[:4], uint32(len(encrypted)))
+	copy(buf[4:], encrypted)
+	if _, err = conn.Write(buf); err != nil {
 		c.mu.Lock()
 		delete(c.connPool, addr)
 		c.mu.Unlock()

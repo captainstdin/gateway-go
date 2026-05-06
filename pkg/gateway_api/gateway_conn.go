@@ -28,13 +28,13 @@ type pooledConn struct {
 	mu        sync.Mutex // 序列化同一连接上的查询
 }
 
-var pool *queryConnPool
+var (
+	pool     *queryConnPool
+	poolOnce sync.Once
+)
 
-// initPool 初始化查询连接池（懒加载，首次查询时调用）
+// initPool 初始化查询连接池
 func initPool() {
-	if pool != nil {
-		return
-	}
 	pool = &queryConnPool{
 		aesKey: crypto.DeriveKey(bw.SecretKey),
 		conns:  make(map[string]*pooledConn),
@@ -91,15 +91,15 @@ func (p *queryConnPool) removeConn(addr string) {
 	p.mu.Unlock()
 }
 
-// sendEncrypted 加密发送
 func (p *queryConnPool) sendEncrypted(conn net.Conn, data []byte) bool {
 	encrypted, err := crypto.Encrypt(data, p.aesKey)
 	if err != nil {
 		return false
 	}
-	lenBuf := make([]byte, 4)
-	binary.BigEndian.PutUint32(lenBuf, uint32(len(encrypted)))
-	_, err = conn.Write(append(lenBuf, encrypted...))
+	buf := make([]byte, 4+len(encrypted))
+	binary.BigEndian.PutUint32(buf[:4], uint32(len(encrypted)))
+	copy(buf[4:], encrypted)
+	_, err = conn.Write(buf)
 	return err == nil
 }
 
@@ -203,9 +203,7 @@ func getAllGatewayAddresses() []string {
 	return bw.GetAllGatewayAddresses()
 }
 
-// ensurePool 确保连接池已初始化
+// ensurePool 确保连接池已初始化（线程安全）
 func ensurePool() {
-	if pool == nil {
-		initPool()
-	}
+	poolOnce.Do(initPool)
 }

@@ -37,5 +37,8 @@ func (p *TextProtocol) Decode(buf []byte) []byte {
 
 // Encode 在数据末尾追加换行符
 func (p *TextProtocol) Encode(data []byte) []byte {
-	return append(data, '\n')
+	buf := make([]byte, len(data)+1)
+	copy(buf, data)
+	buf[len(data)] = '\n'
+	return buf
 }

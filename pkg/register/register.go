@@ -215,7 +215,9 @@ func (r *Register) broadcastAddresses(targetConn net.Conn) {
 		return
 	}
 	r.workerConnections.Range(func(_, value interface{}) bool {
-		value.(net.Conn).Write([]byte(line))
+		if conn, ok := value.(net.Conn); ok {
+			conn.Write([]byte(line))
+		}
 		return true
 	})
 }
@@ -233,7 +235,9 @@ func (r *Register) broadcastStatusToAdmins() {
 		return
 	}
 	r.adminConnections.Range(func(_, value interface{}) bool {
-		value.(net.Conn).Write([]byte(line))
+		if conn, ok := value.(net.Conn); ok {
+			conn.Write([]byte(line))
+		}
 		return true
 	})
 }

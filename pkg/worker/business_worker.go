@@ -296,9 +296,10 @@ func (bw *BusinessWorker) sendEncrypted(conn net.Conn, data []byte) bool {
 	if err != nil {
 		return false
 	}
-	lenBuf := make([]byte, 4)
-	binary.BigEndian.PutUint32(lenBuf, uint32(len(encrypted)))
-	_, err = conn.Write(append(lenBuf, encrypted...))
+	buf := make([]byte, 4+len(encrypted))
+	binary.BigEndian.PutUint32(buf[:4], uint32(len(encrypted)))
+	copy(buf[4:], encrypted)
+	_, err = conn.Write(buf)
 	return err == nil
 }
 

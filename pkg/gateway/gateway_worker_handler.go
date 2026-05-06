@@ -257,43 +257,12 @@ func (g *Gateway) handleWorkerMessage(conn net.Conn, data *protocol.GatewayData,
 }
 
 func (g *Gateway) sendQueryResponse(conn net.Conn, data []byte) {
-	lenBuf := make([]byte, 4)
-	binary.BigEndian.PutUint32(lenBuf, uint32(len(data)))
-	payload := append(lenBuf, data...)
-	g.sendEncrypted(conn, payload)
+	buf := make([]byte, 4+len(data))
+	binary.BigEndian.PutUint32(buf[:4], uint32(len(data)))
+	copy(buf[4:], data)
+	g.sendEncrypted(conn, buf)
 }
 
-func (g *Gateway) handleSendToAll(data *protocol.GatewayData) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-
-	if data.ExtData != "" {
-		var ext struct {
-			Connections []uint32         `json:"connections,omitempty"`
-			Exclude     map[uint32]uint32 `json:"exclude,omitempty"`
-		}
-		json.Unmarshal([]byte(data.ExtData), &ext)
-		if len(ext.Connections) > 0 {
-			for _, id := range ext.Connections {
-				if cc, ok := g.clientConns[id]; ok {
-					cc.Conn.Write(data.Body)
-				}
-			}
-			return
-		}
-		if len(ext.Exclude) > 0 {
-			for _, cc := range g.clientConns {
-				if _, excluded := ext.Exclude[cc.ID]; !excluded {
-					cc.Conn.Write(data.Body)
-				}
-			}
-			return
-		}
-	}
-	for _, cc := range g.clientConns {
-		cc.Conn.Write(data.Body)
-	}
-}
 
 func (g *Gateway) handleBindUID(data *protocol.GatewayData) {
 	uid := data.ExtData
@@ -340,14 +309,20 @@ func (g *Gateway) handleUnbindUID(data *protocol.GatewayData) {
 func (g *Gateway) handleSendToUID(data *protocol.GatewayData) {
 	var uids []string
 	json.Unmarshal([]byte(data.ExtData), &uids)
+
+	var targets []ClientConn
 	g.mu.RLock()
-	defer g.mu.RUnlock()
 	for _, uid := range uids {
 		if uidMap, ok := g.uidConns[uid]; ok {
 			for _, cc := range uidMap {
-				cc.Conn.Write(data.Body)
+				targets = append(targets, cc.Conn)
 			}
 		}
+	}
+	g.mu.RUnlock()
+
+	for _, conn := range targets {
+		conn.Write(data.Body)
 	}
 }
 
@@ -411,16 +386,21 @@ func (g *Gateway) handleSendToGroup(data *protocol.GatewayData) {
 	}
 	json.Unmarshal([]byte(data.ExtData), &ext)
 
+	var targets []ClientConn
 	g.mu.RLock()
-	defer g.mu.RUnlock()
 	for _, group := range ext.Group {
 		if gm, ok := g.groupConns[group]; ok {
 			for _, cc := range gm {
 				if _, excluded := ext.Exclude[cc.ID]; !excluded {
-					cc.Conn.Write(data.Body)
+					targets = append(targets, cc.Conn)
 				}
 			}
 		}
+	}
+	g.mu.RUnlock()
+
+	for _, conn := range targets {
+		conn.Write(data.Body)
 	}
 }
 

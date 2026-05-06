@@ -83,7 +83,15 @@ func (c *TCPClientConn) Read() ([]byte, error) {
 			// 完整包就绪，取出并解码
 			packet := make([]byte, n)
 			copy(packet, c.buf[:n])
-			c.buf = c.buf[n:]
+			remaining := len(c.buf) - n
+			if remaining == 0 {
+				c.buf = c.buf[:0]
+			} else {
+				// 拷贝剩余数据到新 slice，释放旧的底层数组
+				newBuf := make([]byte, remaining)
+				copy(newBuf, c.buf[n:])
+				c.buf = newBuf
+			}
 			return c.protocol.Decode(packet), nil
 		}
 		// 数据不够，继续从连接读取

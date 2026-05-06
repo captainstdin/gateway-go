@@ -223,6 +223,48 @@ func (g *Gateway) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	g.onClientClose(clientConn)
 }
 
+func (g *Gateway) handleSendToAll(data *protocol.GatewayData) {
+	// 在锁内快照目标连接列表，锁外执行 I/O
+	// 避免慢速 WebSocket Write 持有 RLock 阻塞整个 Gateway
+	var targets []ClientConn
+
+	g.mu.RLock()
+	if data.ExtData != "" {
+		var ext struct {
+			Connections []uint32         `json:"connections,omitempty"`
+			Exclude     map[uint32]uint32 `json:"exclude,omitempty"`
+		}
+		json.Unmarshal([]byte(data.ExtData), &ext)
+		if len(ext.Connections) > 0 {
+			targets = make([]ClientConn, 0, len(ext.Connections))
+			for _, id := range ext.Connections {
+				if cc, ok := g.clientConns[id]; ok {
+					targets = append(targets, cc.Conn)
+				}
+			}
+		} else if len(ext.Exclude) > 0 {
+			targets = make([]ClientConn, 0, len(g.clientConns))
+			for _, cc := range g.clientConns {
+				if _, excluded := ext.Exclude[cc.ID]; !excluded {
+					targets = append(targets, cc.Conn)
+				}
+			}
+		}
+	}
+	if targets == nil {
+		targets = make([]ClientConn, 0, len(g.clientConns))
+		for _, cc := range g.clientConns {
+			targets = append(targets, cc.Conn)
+		}
+	}
+	g.mu.RUnlock()
+
+	// 锁外批量写，不阻塞其他 goroutine
+	for _, conn := range targets {
+		conn.Write(data.Body)
+	}
+}
+
 func (g *Gateway) acceptTCPClients(ln net.Listener, proto ClientProtocol) {
 	for {
 		conn, err := ln.Accept()
@@ -354,7 +396,12 @@ func (g *Gateway) sendToWorker(cmd uint8, conn *ClientConnection, body []byte) b
 	gd.Flag = protocol.FlagBodyIsScalar
 
 	encoded := protocol.Encode(&gd)
-	return g.sendEncrypted(g.workerConns[selectedKey], encoded)
+
+	// 在锁内取出 conn，避免无锁读 map 导致 concurrent map read/write panic
+	g.mu.RLock()
+	wConn := g.workerConns[selectedKey]
+	g.mu.RUnlock()
+	return g.sendEncrypted(wConn, encoded)
 }
 
 func (g *Gateway) sendEncrypted(conn net.Conn, data []byte) bool {
@@ -366,9 +413,10 @@ func (g *Gateway) sendEncrypted(conn net.Conn, data []byte) bool {
 		log.Printf("[Gateway] Encrypt error: %v", err)
 		return false
 	}
-	lenBuf := make([]byte, 4)
-	binary.BigEndian.PutUint32(lenBuf, uint32(len(encrypted)))
-	_, err = conn.Write(append(lenBuf, encrypted...))
+	buf := make([]byte, 4+len(encrypted))
+	binary.BigEndian.PutUint32(buf[:4], uint32(len(encrypted)))
+	copy(buf[4:], encrypted)
+	_, err = conn.Write(buf)
 	return err == nil
 }
 
@@ -545,6 +593,12 @@ func (g *Gateway) ping() {
 func (g *Gateway) pingWorkerLoop() {
 	ticker := time.NewTicker(25 * time.Second)
 	defer ticker.Stop()
+
+	// 心跳包固定不变，预编码一次
+	pingGd := protocol.NewEmptyData()
+	pingGd.Cmd = protocol.CmdPing
+	pingPayload := protocol.Encode(pingGd)
+
 	for {
 		select {
 		case <-g.stopCh:
@@ -552,9 +606,7 @@ func (g *Gateway) pingWorkerLoop() {
 		case <-ticker.C:
 			g.mu.RLock()
 			for _, wconn := range g.workerConns {
-				gd := protocol.NewEmptyData()
-				gd.Cmd = protocol.CmdPing
-				g.sendEncrypted(wconn, protocol.Encode(gd))
+				g.sendEncrypted(wconn, pingPayload)
 			}
 			g.mu.RUnlock()
 		}
