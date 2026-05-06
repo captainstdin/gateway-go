@@ -4,9 +4,13 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"html/template"
 	"io/fs"
+	"log"
+	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -23,10 +27,61 @@ import (
 var linkRegex = regexp.MustCompile(`href="([^"]+)\.md(#.*?)?"`)
 
 func main() {
+	cwd, err := os.Getwd()
+	if err == nil && filepath.Base(cwd) == "docs-web" {
+		if err := os.Chdir(".."); err != nil {
+			fmt.Println("⚠️ 无法切换到项目根目录，请在正确的目录下运行。")
+			os.Exit(1)
+		}
+	} else if _, err := os.Stat("docs-web/templates/layout.html"); os.IsNotExist(err) {
+		fmt.Println("⚠️ 请在 gatewayworker-go 项目根目录下运行此脚本 (或者在 docs-web 目录下运行): go run docs-web/main.go")
+		os.Exit(1)
+	}
+
+	if len(os.Args) > 1 {
+		buildDocs()
+	} else {
+		startServer("docs-web")
+	}
+}
+
+func startServer(dir string) {
+	port := "8080"
+	fs := http.FileServer(http.Dir(dir))
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+		fs.ServeHTTP(w, r)
+	})
+
+	addr := ":" + port
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		fmt.Printf("⚠️  端口 %s 可能已被占用，正在尝试随机分配可用端口...\n", port)
+		listener, err = net.Listen("tcp", ":0")
+		if err != nil {
+			log.Fatalf("❌ 无法监听任何端口: %v", err)
+		}
+	}
+
+	actualPort := listener.Addr().(*net.TCPAddr).Port
+	fmt.Printf("\n🚀 Web 服务器启动成功！\n")
+	fmt.Printf("👉 访问地址: http://localhost:%d\n", actualPort)
+	fmt.Printf("📂 正在代理目录: %s\n", dir)
+	fmt.Println("Press Ctrl+C to stop")
+
+	err = http.Serve(listener, nil)
+	if err != nil {
+		log.Fatalf("❌ 服务器运行异常退出: %v", err)
+	}
+}
+
+func buildDocs() {
 	outDir := "docs-web"
 	if entries, err := os.ReadDir(outDir); err == nil {
 		for _, e := range entries {
-			if e.Name() != "main.go" {
+			if e.Name() != "main.go" && e.Name() != "templates" {
 				os.RemoveAll(filepath.Join(outDir, e.Name()))
 			}
 		}
@@ -126,14 +181,63 @@ func main() {
 		}
 	}
 
-	// 复制 index
-	if _, err := os.Stat(filepath.Join(outDir, "docs/README.html")); err == nil {
-		copyFile(filepath.Join(outDir, "docs/README.html"), filepath.Join(outDir, "index.html"))
-	} else if _, err := os.Stat(filepath.Join(outDir, "README.html")); err == nil {
-		copyFile(filepath.Join(outDir, "README.html"), filepath.Join(outDir, "index.html"))
-	}
+	// 生成自定义首页
+	generateIndexHTML(outDir, navHTML)
 
 	fmt.Println("🎉 文档生成完毕！可以直接在浏览器中打开 docs-web/index.html")
+}
+
+func generateIndexHTML(outDir, navHTML string) {
+	// 获取 Git 信息
+	hash, _ := exec.Command("git", "rev-parse", "--short", "HEAD").Output()
+	branch, _ := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD").Output()
+	date, _ := exec.Command("git", "log", "-1", "--format=%cd", "--date=format:%Y-%m-%d %H:%M:%S").Output()
+	
+	// 统计代码行数
+	var totalLines int
+	var fileCount int
+	filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		if strings.HasSuffix(path, ".go") && !strings.Contains(path, "vendor/") {
+			content, err := os.ReadFile(path)
+			if err == nil {
+				totalLines += bytes.Count(content, []byte{'\n'}) + 1
+				fileCount++
+			}
+		}
+		return nil
+	})
+
+	tmpl, err := template.ParseFiles("docs-web/templates/dashboard.html")
+	if err != nil {
+		fmt.Printf("⚠️ 无法加载仪表盘模板: %v\n", err)
+		return
+	}
+
+	var buf bytes.Buffer
+	data := struct {
+		Branch     string
+		Hash       string
+		Date       string
+		FileCount  int
+		TotalLines int
+	}{
+		Branch:     strings.TrimSpace(string(branch)),
+		Hash:       strings.TrimSpace(string(hash)),
+		Date:       strings.TrimSpace(string(date)),
+		FileCount:  fileCount,
+		TotalLines: totalLines,
+	}
+
+	if err := tmpl.Execute(&buf, data); err != nil {
+		fmt.Printf("⚠️ 渲染仪表盘失败: %v\n", err)
+		return
+	}
+
+	fullHTML := wrapHTML("首页", navHTML, buf.String(), "./")
+	os.WriteFile(filepath.Join(outDir, "index.html"), []byte(fullHTML), 0644)
 }
 
 func buildNavigation(files []string) string {
@@ -151,7 +255,7 @@ func buildNavigation(files []string) string {
 		}
 	}
 
-	sb.WriteString("<h3>主目录</h3><ul>")
+	sb.WriteString(`<h3><a href="/index.html">主目录</a></h3><ul>`)
 	for _, f := range rootFiles {
 		sb.WriteString(fmt.Sprintf(`<li><a href="/%s">%s</a></li>`, toHTML(f), filepath.Base(f)))
 	}
@@ -196,7 +300,17 @@ func generateChromaCSS(outPath string) {
 	}
 	defer f.Close()
 	formatter := html.New(html.WithClasses(true))
+	
+	f.WriteString("@media (prefers-color-scheme: light) {\n")
 	formatter.WriteCSS(f, styles.Get("github"))
+	f.WriteString("}\n\n@media (prefers-color-scheme: dark) {\n")
+	
+	darkStyle := styles.Get("github-dark")
+	if darkStyle.Name == "fallback" {
+		darkStyle = styles.Get("monokai")
+	}
+	formatter.WriteCSS(f, darkStyle)
+	f.WriteString("}\n")
 }
 
 func downloadCSS(url, outPath string) {
@@ -219,89 +333,29 @@ func wrapHTML(title, nav, content, resourcePrefix string) string {
 	// 将导航里的绝对路径 / 开头替换为当前前缀
 	navStr := strings.ReplaceAll(nav, `href="/`, `href="`+resourcePrefix)
 
-	return fmt.Sprintf(`<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>%s - GatewayWorker-Go 文档</title>
-    <link rel="stylesheet" href="%sgithub-markdown.css">
-    <link rel="stylesheet" href="%schroma.css">
-    <style>
-        body {
-            display: flex;
-            margin: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-            background-color: #fff;
-            color: #24292f;
-        }
-        .sidebar {
-            width: 280px;
-            height: 100vh;
-            overflow-y: auto;
-            background: #f6f8fa;
-            border-right: 1px solid #d0d7de;
-            padding: 20px;
-            position: fixed;
-            box-sizing: border-box;
-        }
-        .sidebar h3 {
-            margin-top: 1.5em;
-            margin-bottom: 0.5em;
-            font-size: 14px;
-            color: #57606a;
-            text-transform: uppercase;
-        }
-        .sidebar h3:first-child { margin-top: 0; }
-        .sidebar ul {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-        .sidebar li {
-            margin-bottom: 6px;
-        }
-        .sidebar a {
-            text-decoration: none;
-            color: #0969da;
-            font-size: 14px;
-            display: block;
-            padding: 4px 8px;
-            border-radius: 6px;
-        }
-        .sidebar a:hover {
-            background-color: #eaf0f6;
-            text-decoration: underline;
-        }
-        .content {
-            margin-left: 280px;
-            padding: 40px;
-            max-width: 900px;
-            width: 100%%;
-            box-sizing: border-box;
-        }
-        .markdown-body {
-            box-sizing: border-box;
-            min-width: 200px;
-            max-width: 980px;
-            margin: 0 auto;
-            padding: 45px;
-        }
-        @media (max-width: 767px) {
-            .markdown-body { padding: 15px; }
-            body { flex-direction: column; }
-            .sidebar { width: 100%%; height: auto; position: relative; border-right: none; border-bottom: 1px solid #d0d7de; }
-            .content { margin-left: 0; }
-        }
-    </style>
-</head>
-<body>
-    <div class="sidebar">
-        %s
-    </div>
-    <div class="content markdown-body">
-        %s
-    </div>
-</body>
-</html>`, title, resourcePrefix, resourcePrefix, navStr, content)
+	tmpl, err := template.ParseFiles("docs-web/templates/layout.html")
+	if err != nil {
+		fmt.Printf("⚠️ 无法加载布局模板: %v\n", err)
+		return content
+	}
+
+	var buf bytes.Buffer
+	data := struct {
+		Title          string
+		ResourcePrefix string
+		NavHTML        template.HTML
+		Content        template.HTML
+	}{
+		Title:          title,
+		ResourcePrefix: resourcePrefix,
+		NavHTML:        template.HTML(navStr),
+		Content:        template.HTML(content),
+	}
+
+	if err := tmpl.Execute(&buf, data); err != nil {
+		fmt.Printf("⚠️ 渲染布局模板失败: %v\n", err)
+		return content
+	}
+
+	return buf.String()
 }

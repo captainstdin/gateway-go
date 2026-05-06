@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>README.md - GatewayWorker-Go 文档</title>
-    <link rel="stylesheet" href="../github-markdown.css">
-    <link rel="stylesheet" href="../chroma.css">
+    <title>{{.Title}} - GatewayWorker-Go 文档</title>
+    <link rel="stylesheet" href="{{.ResourcePrefix}}github-markdown.css">
+    <link rel="stylesheet" href="{{.ResourcePrefix}}chroma.css">
     <style>
         :root {
             --bg-body: #ffffff;
@@ -116,44 +116,17 @@
 </head>
 <body>
     <div class="sidebar">
-        <h3><a href="../index.html">主目录</a></h3><ul></ul><h3>使用文档 (docs)</h3><ul><li><a href="../docs/cheatsheet.html">cheatsheet.md</a></li><li><a href="../docs/README.html">README.md</a></li><li><a href="../docs/architecture.html">architecture.md</a></li><li><a href="../docs/usage.html">usage.md</a></li><li><a href="../docs/best-practices.html">best-practices.md</a></li><li><a href="../docs/code-usage.html">code-usage.md</a></li><li><a href="../docs/gateway-sdk.html">gateway-sdk.md</a></li><li><a href="../docs/internals.html">internals.md</a></li><li><a href="../docs/optimize2ai.html">optimize2ai.md</a></li><li><a href="../docs/php-vs-go.html">php-vs-go.md</a></li></ul><h3>包文档 (pkg)</h3><ul><li><a href="../pkg/context/README.html">pkg/context</a></li><li><a href="../pkg/crypto/README.html">pkg/crypto</a></li><li><a href="../pkg/gateway/README.html">pkg/gateway</a></li><li><a href="../pkg/gateway_api/README.html">pkg/gateway_api</a></li><li><a href="../pkg/gateway_sdk/README.html">pkg/gateway_sdk</a></li><li><a href="../pkg/protocol/README.html">pkg/protocol</a></li><li><a href="../pkg/register/README.html">pkg/register</a></li><li><a href="../pkg/worker/README.html">pkg/worker</a></li></ul>
+        {{.NavHTML}}
     </div>
     <div class="content">
         <div class="markdown-body">
-            <h1 id="gatewayworker-go">GatewayWorker-Go</h1>
-<p>高性能、可扩展的实时通讯框架，基于 Gateway + Worker 分离架构。</p>
-<h2 id="heading">文档</h2>
-<ul>
-<li><a href="cheatsheet.html"><strong>⚡ 速查手册</strong></a> — 30 秒理解整个系统，不知道看啥先看这个</li>
-<li><a href="architecture.html"><strong>架构原理</strong></a> — 系统设计、组件详解、通讯协议、安全机制</li>
-<li><a href="internals.html"><strong>内部设计备忘</strong></a> — 🔑 关键设计决策、锁模式、踩坑记录（修改代码前必读）</li>
-<li><a href="usage.html"><strong>使用指南</strong></a> — 快速开始、配置参数、业务开发、API 参考、部署方式</li>
-<li><a href="gateway-sdk.html"><strong>GatewaySDK</strong></a> — 外部进程推送 SDK，完整 API 参考与用法示例</li>
-<li><a href="code-usage.html"><strong>代码示例</strong></a> — 完整的代码用法和示例</li>
-<li><a href="best-practices.html"><strong>开发注意事项</strong></a> — 包大小限制、Session 使用、回调安全、性能规划</li>
-<li><a href="php-vs-go.html"><strong>PHP vs Go 对比</strong></a> — 架构原理、用法、性能、安全、部署的完整对比</li>
-<li><a href="optimize2ai.html"><strong>AI 优化记录</strong></a> — 两轮代码审查修复的 13 处核心问题（带 diff）</li>
-</ul>
-<h2 id="heading-1">特性</h2>
-<ul>
-<li>🔌 Gateway/Worker 分离，支持热更新业务逻辑</li>
-<li>🌐 同时支持 WebSocket 和 TCP 客户端，URI 风格地址配置（<code>ws://</code>、<code>tcp://</code>、<code>frame://</code>、<code>text://</code>）</li>
-<li>🔒 内部通讯 AES-256-CBC 加密</li>
-<li>⚖️ 自动负载均衡（最少连接数 / 随机）</li>
-<li>📡 GatewaySDK，任意进程可推送消息</li>
-<li>🔄 自动断线重连</li>
-<li>💓 心跳检测</li>
-<li>🛡️ 多 Register 高可用，防止单点故障</li>
-<li>📊 Dashboard 实时监控面板（Gateway 在线数 / Worker 处理次数）</li>
-<li>🔗 完整 API 对标 PHP 版（37 个方法全覆盖）</li>
-</ul>
-
+            {{.Content}}
         </div>
     </div>
     <script>
         document.addEventListener("DOMContentLoaded", function() {
             var links = document.querySelectorAll('.sidebar a');
-            var currentUrl = window.location.href.split('#')[0]; 
+            var currentUrl = window.location.href.split('#')[0]; // Ignore hash for matching
             links.forEach(function(link) {
                 var linkUrl = link.href.split('#')[0];
                 if (linkUrl === currentUrl || (currentUrl.endsWith('/') && linkUrl.endsWith('/index.html'))) {

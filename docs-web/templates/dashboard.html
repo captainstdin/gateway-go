@@ -1,126 +1,4 @@
-<!DOCTYPE html>
-<html lang="zh-CN" data-color-mode="auto" data-light-theme="light" data-dark-theme="dark">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>首页 - GatewayWorker-Go 文档</title>
-    <link rel="stylesheet" href="./github-markdown.css">
-    <link rel="stylesheet" href="./chroma.css">
-    <style>
-        :root {
-            --bg-body: #ffffff;
-            --bg-sidebar: #f6f8fa;
-            --bg-sidebar-hover: #eaf0f6;
-            --border-color: #d0d7de;
-            --text-primary: #24292f;
-            --text-secondary: #57606a;
-            --link-color: #0969da;
-            --active-bg: #0969da;
-            --active-text: #ffffff;
-        }
-
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --bg-body: #0d1117;
-                --bg-sidebar: #161b22;
-                --bg-sidebar-hover: #21262d;
-                --border-color: #30363d;
-                --text-primary: #c9d1d9;
-                --text-secondary: #8b949e;
-                --link-color: #58a6ff;
-                --active-bg: #1f6feb;
-                --active-text: #ffffff;
-            }
-        }
-
-        body {
-            margin: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-            background-color: var(--bg-body);
-            color: var(--text-primary);
-            color-scheme: light dark;
-        }
-        .sidebar {
-            width: 250px;
-            height: 100vh;
-            overflow-y: auto;
-            background: var(--bg-sidebar);
-            border-right: 1px solid var(--border-color);
-            padding: 16px;
-            position: fixed;
-            top: 0;
-            left: 0;
-            box-sizing: border-box;
-        }
-        .sidebar h3 {
-            margin-top: 1.2em;
-            margin-bottom: 0.4em;
-            font-size: 13px;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-        }
-        .sidebar h3 a {
-            color: inherit;
-            text-decoration: none;
-        }
-        .sidebar h3 a:hover {
-            color: var(--link-color);
-        }
-        .sidebar h3:first-child { margin-top: 0; }
-        .sidebar ul {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-        .sidebar li {
-            margin-bottom: 4px;
-        }
-        .sidebar a {
-            text-decoration: none;
-            color: var(--link-color);
-            font-size: 14px;
-            display: block;
-            padding: 6px 10px;
-            border-radius: 6px;
-            transition: background-color 0.2s ease, color 0.2s ease;
-        }
-        .sidebar a:hover {
-            background-color: var(--bg-sidebar-hover);
-        }
-        .sidebar a.active {
-            background-color: var(--active-bg);
-            color: var(--active-text) !important;
-            font-weight: 500;
-        }
-        .sidebar a.active:hover {
-            background-color: var(--active-bg);
-            text-decoration: none;
-        }
-        .content {
-            margin-left: 250px;
-            padding: 24px 32px;
-            box-sizing: border-box;
-        }
-        .markdown-body {
-            box-sizing: border-box;
-            min-width: 200px;
-            max-width: 1024px;
-            margin: 0 auto;
-        }
-        @media (max-width: 767px) {
-            .sidebar { width: 100%; height: auto; position: relative; border-right: none; border-bottom: 1px solid var(--border-color); }
-            .content { margin-left: 0; padding: 15px; }
-            .markdown-body { padding: 0; }
-        }
-    </style>
-</head>
-<body>
-    <div class="sidebar">
-        <h3><a href="./index.html">主目录</a></h3><ul></ul><h3>使用文档 (docs)</h3><ul><li><a href="./docs/cheatsheet.html">cheatsheet.md</a></li><li><a href="./docs/README.html">README.md</a></li><li><a href="./docs/architecture.html">architecture.md</a></li><li><a href="./docs/usage.html">usage.md</a></li><li><a href="./docs/best-practices.html">best-practices.md</a></li><li><a href="./docs/code-usage.html">code-usage.md</a></li><li><a href="./docs/gateway-sdk.html">gateway-sdk.md</a></li><li><a href="./docs/internals.html">internals.md</a></li><li><a href="./docs/optimize2ai.html">optimize2ai.md</a></li><li><a href="./docs/php-vs-go.html">php-vs-go.md</a></li></ul><h3>包文档 (pkg)</h3><ul><li><a href="./pkg/context/README.html">pkg/context</a></li><li><a href="./pkg/crypto/README.html">pkg/crypto</a></li><li><a href="./pkg/gateway/README.html">pkg/gateway</a></li><li><a href="./pkg/gateway_api/README.html">pkg/gateway_api</a></li><li><a href="./pkg/gateway_sdk/README.html">pkg/gateway_sdk</a></li><li><a href="./pkg/protocol/README.html">pkg/protocol</a></li><li><a href="./pkg/register/README.html">pkg/register</a></li><li><a href="./pkg/worker/README.html">pkg/worker</a></li></ul>
-    </div>
-    <div class="content">
-        <div class="markdown-body">
-            <style>
+<style>
     :root {
         --dash-bg: #ffffff;
         --dash-card-bg: rgba(255, 255, 255, 0.6);
@@ -175,7 +53,7 @@
         letter-spacing: -0.02em;
         margin-bottom: 12px;
         border-bottom: none;
-         
+        /* Animated Gradient Text */
         background: linear-gradient(135deg, var(--dash-gradient-1), var(--dash-gradient-2), var(--dash-gradient-1));
         background-size: 200% auto;
         color: transparent;
@@ -204,7 +82,7 @@
         margin-top: 10px;
     }
 
-     
+    /* Glassmorphism Cards */
     .apple-card {
         background: var(--dash-card-bg);
         backdrop-filter: blur(20px);
@@ -219,7 +97,7 @@
         overflow: hidden;
     }
 
-     
+    /* Glowing orb behind cards on hover */
     .apple-card::before {
         content: '';
         position: absolute;
@@ -267,7 +145,7 @@
         gap: 12px;
     }
 
-     
+    /* Animated Icons */
     .icon-bounce {
         display: inline-block;
         transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -400,17 +278,17 @@
         <div class="apple-card">
             <h2><span class="icon-bounce" style="font-size: 26px;">📊</span> 版本与状态</h2>
             <ul class="apple-stat-list">
-                <li><span>当前分支</span> <span class="apple-stat-value">main</span></li>
-                <li><span>最新提交</span> <span class="apple-stat-value">f4912b9</span></li>
-                <li><span>更新时间</span> <span class="apple-stat-value">2026-05-06 23:53:57</span></li>
+                <li><span>当前分支</span> <span class="apple-stat-value">{{.Branch}}</span></li>
+                <li><span>最新提交</span> <span class="apple-stat-value">{{.Hash}}</span></li>
+                <li><span>更新时间</span> <span class="apple-stat-value">{{.Date}}</span></li>
             </ul>
         </div>
 
         <div class="apple-card">
             <h2><span class="icon-bounce" style="font-size: 26px;">📈</span> 代码统计</h2>
             <ul class="apple-stat-list">
-                <li><span>Go 文件数</span> <span class="apple-stat-value">24 个</span></li>
-                <li><span>代码总行数</span> <span class="apple-stat-value">5738 行</span></li>
+                <li><span>Go 文件数</span> <span class="apple-stat-value">{{.FileCount}} 个</span></li>
+                <li><span>代码总行数</span> <span class="apple-stat-value">{{.TotalLines}} 行</span></li>
                 <li><span>开发语言</span> <span class="apple-stat-value">Google Go 1.22</span></li>
             </ul>
         </div>
@@ -436,19 +314,3 @@
         </div>
     </div>
 </div>
-        </div>
-    </div>
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            var links = document.querySelectorAll('.sidebar a');
-            var currentUrl = window.location.href.split('#')[0]; 
-            links.forEach(function(link) {
-                var linkUrl = link.href.split('#')[0];
-                if (linkUrl === currentUrl || (currentUrl.endsWith('/') && linkUrl.endsWith('/index.html'))) {
-                    link.classList.add('active');
-                }
-            });
-        });
-    </script>
-</body>
-</html>
