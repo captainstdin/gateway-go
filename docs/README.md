@@ -6,6 +6,7 @@
 
 - [**架构原理**](architecture.md) — 系统设计、组件详解、通讯协议、安全机制
 - [**使用指南**](usage.md) — 快速开始、配置参数、业务开发、API 参考、部署方式
+- [**GatewayClient SDK**](gateway-client-sdk.md) — 外部进程推送 SDK，完整 API 参考与用法示例
 - [**代码示例**](code-usage.md) — 完整的代码用法和示例
 - [**PHP vs Go 对比**](php-vs-go.md) — 架构原理、用法、性能、安全、部署的完整对比
 - [**开发注意事项**](best-practices.md) — 包大小限制、Session 使用、回调安全、性能规划

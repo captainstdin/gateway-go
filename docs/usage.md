@@ -325,7 +325,7 @@ func main() {
 
 ## GatewayClient SDK
 
-用于从 **Worker 外部的其他进程** 向客户端推送消息。
+用于从 **Worker 外部的其他进程** 向客户端推送消息。完整 API 参考见 [GatewayClient SDK 文档](gateway-client-sdk.md)。
 
 ### 典型场景
 
@@ -425,13 +425,28 @@ func main() {
 | `CloseClient(clientID, message)` | 踢出（先发消息再断开） |
 | `DestroyClient(clientID)` | 直接销毁 |
 
-### 仅 GatewayClient 可用
+### 查询类（GatewayClient 和 gateway_api 均可用）
 
 | 方法 | 说明 |
 |------|------|
-| `IsOnline(clientID)` | 判断是否在线 |
+| `IsOnline(clientID)` | 判断 client_id 是否在线 |
+| `IsUidOnline(uid)` | 判断 uid 是否在线 |
 | `GetAllClientCount()` | 获取在线连接总数 |
+| `GetClientCountByGroup(group)` | 获取分组在线连接数 |
 | `GetSession(clientID)` | 获取 session |
+| `GetAllClientSessions()` | 所有客户端 session |
+| `GetClientSessionsByGroup(group)` | 分组成员 session |
+| `GetAllClientIdList()` | 所有在线 client_id 列表 |
+| `GetClientIdListByGroup(group)` | 分组成员 client_id 列表 |
+| `GetClientIdByUid(uid)` | 获取 uid 绑定的 client_id |
+| `GetUidByClientId(clientID)` | 通过 client_id 获取 uid |
+| `GetAllUidList()` | 全局在线 uid 列表 |
+| `GetAllUidCount()` | 全局在线 uid 数量 |
+| `GetUidListByGroup(group)` | 分组在线 uid 列表 |
+| `GetAllGroupIdList()` | 所有在线分组 ID 列表 |
+
+> 完整 API 和用法示例见 [GatewayClient SDK 文档](gateway-client-sdk.md)
+
 
 ---
 

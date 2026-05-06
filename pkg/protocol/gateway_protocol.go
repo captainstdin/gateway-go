@@ -54,6 +54,11 @@ const (
 // HeadLen 包头固定长度 28 字节
 const HeadLen = 28
 
+// MaxEncryptedPacketSize 内部加密通讯的最大包体限制（50MB）
+// 用于 Gateway、Worker、GatewayClient 读取加密包时的安全检查，
+// 防止恶意或损坏的数据导致 OOM。
+const MaxEncryptedPacketSize = 50 * 1024 * 1024
+
 // GatewayData Gateway 与 Worker 间通讯的数据结构
 type GatewayData struct {
 	PackLen      uint32 // 整包长度（编码时自动计算）

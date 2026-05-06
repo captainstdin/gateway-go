@@ -309,7 +309,7 @@ func (bw *BusinessWorker) readEncryptedPacket(conn net.Conn) ([]byte, error) {
 		return nil, err
 	}
 	length := binary.BigEndian.Uint32(lenBuf)
-	if length > 50*1024*1024 {
+	if length > protocol.MaxEncryptedPacketSize {
 		return nil, fmt.Errorf("packet too large: %d", length)
 	}
 	ciphertext := make([]byte, length)
