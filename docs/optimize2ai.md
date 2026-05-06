@@ -211,7 +211,7 @@
 
 ---
 
-## 修复统计
+## 第一二轮修复统计
 
 | 等级 | 数量 | 说明 |
 |---|---|---|
@@ -231,3 +231,145 @@
 | `FrameProtocol.Encode` 的 append | 客户端协议编码，频率远低于内部通讯 |
 | `handleSelect` 锁内 json.Marshal | 纯 CPU 操作不涉及 I/O，不阻塞 |
 | 用户回调不加 recover | Go 惯例让 panic 暴露，方便调试 |
+
+---
+
+## 第三轮：GatewaySDK 深度审查
+
+> 针对 `pkg/gateway_sdk/gateway_sdk.go` 的专项审查。
+
+### 🔴 #14 sendAndRecv 恶意 rLen 导致 OOM panic
+
+**文件**: `pkg/gateway_sdk/gateway_sdk.go` — `sendAndRecv`
+
+**问题**: 收到 `rLen = 4GB` 时，`make([]byte, rLen)` 直接 OOM panic，无法 recover。
+
+```diff
+ rLen := binary.BigEndian.Uint32(rLenBuf)
++if rLen > protocol.MaxEncryptedPacketSize {
++    c.evictConn(addr)
++    return nil, fmt.Errorf("response too large: %d bytes", rLen)
++}
+ ciphertext := make([]byte, rLen)
+```
+
+---
+
+### 🔴 #15 sendAndRecv 读失败不踢连接 → 连接池"僵尸连接"
+
+**文件**: `pkg/gateway_sdk/gateway_sdk.go` — `sendAndRecv`
+
+**问题**: `io.ReadFull` 失败后，死连接留在 pool 中。后续所有请求都走这条死连接，持续失败直到 50s TTL。
+
+```diff
+ if _, err = io.ReadFull(conn, rLenBuf); err != nil {
++    c.evictConn(addr)
+     return nil, err
+ }
+```
+
+同时对 `ReadFull(conn, ciphertext)` 也做了相同修复。
+
+---
+
+### 🔴 #16 getGatewayAddresses 持锁做网络 I/O
+
+**文件**: `pkg/gateway_sdk/gateway_sdk.go` — `getGatewayAddresses`
+
+**问题**: `mu.Lock()` 持有期间执行 `net.DialTimeout`（3s 超时）+ `bufio.Scanner`（5s 超时），所有其他 goroutine 全部阻塞。
+
+```diff
+-c.mu.Lock()
+-defer c.mu.Unlock()
+-// ... 整个函数都在锁内 ...
+
++c.mu.Lock()
++if 缓存有效 { Unlock; return cached }
++oldCache := c.addrCache
++c.mu.Unlock()
++// 锁外执行网络 I/O
++for _, regAddr := range c.RegisterAddr { ... }
++// 成功后 Lock 更新缓存
++c.mu.Lock()
++c.addrCache = resp.Addresses
++c.mu.Unlock()
+```
+
+---
+
+### 🟡 #17 getConn 认证 Write 错误被忽略
+
+**文件**: `pkg/gateway_sdk/gateway_sdk.go` — `getConn`
+
+**问题**: `conn.Write(buf)` 的返回值被丢弃，写入失败的连接仍被放入 connPool。
+
+```diff
+-conn.Write(buf)
++if _, err = conn.Write(buf); err != nil {
++    conn.Close()
++    return nil, fmt.Errorf("write auth failed: %w", err)
++}
+```
+
+---
+
+### 🟢 #18 GetAllClientCount 串行查询
+
+**文件**: `pkg/gateway_sdk/gateway_sdk.go` — `GetAllClientCount`
+
+**问题**: 逐个 Gateway 串行查询，而其他查询方法已使用 `queryAllGateways` 并发查询。
+
+```diff
+-for _, addr := range addrs {
+-    resp, err := c.sendAndRecv(addr, gd)
+-    ...
+-}
++results := c.queryAllGateways(gd)
++for _, r := range results { ... }
+```
+
+---
+
+### 🟢 #19 evictConn 统一提取 + 连接 Close
+
+**问题**: 原先 `sendToGateway` 和 `sendAndRecv` 的错误路径中，`delete(c.connPool, addr)` 但不 Close 连接，导致文件描述符泄漏。
+
+```diff
++func (c *GatewaySDK) evictConn(addr string) {
++    c.mu.Lock()
++    if e, ok := c.connPool[addr]; ok {
++        e.conn.Close()
++        delete(c.connPool, addr)
++    }
++    c.mu.Unlock()
++}
+```
+
+---
+
+### 🟢 #20 MaxEncryptedPacketSize 常量提取
+
+**问题**: `50*1024*1024` 魔法数字散落在 4 个文件中（gateway.go、business_worker.go、gateway_conn.go、gateway_sdk.go）。
+
+**修复**: 提取到 `protocol.MaxEncryptedPacketSize` 常量，修改一处全局生效。
+
+---
+
+### 第三轮总结
+
+| 等级 | 数量 | 说明 |
+|---|---|---|
+| 🔴 必修（crash / 阻塞） | **3** | OOM panic、僵尸连接、锁下 I/O |
+| 🟡 应修（静默失败） | **1** | 认证写入错误忽略 |
+| 🟢 优化（性能 / 可维护） | **3** | 并发查询、evictConn 提取、常量统一 |
+| **本轮小计** | **7** | |
+
+### 三轮累计
+
+| 等级 | 累计 |
+|---|---|
+| 🔴 必修 | **8** |
+| 🟡 应修 | **6** |
+| 🟢 优化 | **6** |
+| **总计** | **20** |
+
