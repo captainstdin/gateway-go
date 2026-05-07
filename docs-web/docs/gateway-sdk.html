@@ -342,7 +342,7 @@
 </tbody>
 </table>
 <pre class="chroma"><code><span class="line"><span class="cl"><span class="c1">// 发送给单个客户端</span><span class="w">
-</span></span></span><span class="line"><span class="cl"><span class="nx">client</span><span class="p">.</span><span class="nf">SendToClient</span><span class="p">(</span><span class="s">&#34;7f000001d4310000001&#34;</span><span class="p">,</span><span class="w"> </span><span class="p">[]</span><span class="nb">byte</span><span class="p">(</span><span class="s">&#34;hello&#34;</span><span class="p">))</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="nx">client</span><span class="p">.</span><span class="nf">SendToClient</span><span class="p">(</span><span class="s">&#34;7f000001d43100000001&#34;</span><span class="p">,</span><span class="w"> </span><span class="p">[]</span><span class="nb">byte</span><span class="p">(</span><span class="s">&#34;hello&#34;</span><span class="p">))</span><span class="w">
 </span></span></span><span class="line"><span class="cl"><span class="w">
 </span></span></span><span class="line"><span class="cl"><span class="c1">// 广播</span><span class="w">
 </span></span></span><span class="line"><span class="cl"><span class="nx">client</span><span class="p">.</span><span class="nf">SendToAll</span><span class="p">([]</span><span class="nb">byte</span><span class="p">(</span><span class="s">`{&#34;type&#34;:&#34;broadcast&#34;,&#34;msg&#34;:&#34;大家好&#34;}`</span><span class="p">))</span><span class="w">

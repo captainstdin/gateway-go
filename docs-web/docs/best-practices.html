@@ -289,9 +289,9 @@
 <td>无换行符且缓冲区 &gt; 10MB 断开</td>
 </tr>
 <tr>
-<td><code>ws://</code> (WebSocket)</td>
-<td><strong>无框架限制</strong></td>
-<td>受 gorilla/websocket 默认限制，需注意</td>
+<td><code>ws://</code> / <code>wss://</code> (WebSocket)</td>
+<td><strong>512MB</strong>（gorilla 默认 ReadLimit）</td>
+<td>实际建议远低于此；wss:// 在此基础上增加 TLS 层</td>
 </tr>
 </tbody>
 </table>

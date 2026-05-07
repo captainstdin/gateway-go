@@ -206,7 +206,7 @@
 </span></span><span class="line"><span class="cl">./bin/register -listen <span class="s2">&#34;text://0.0.0.0:51234&#34;</span> -key <span class="s2">&#34;my-secret-key&#34;</span>
 </span></span><span class="line"><span class="cl">
 </span></span><span class="line"><span class="cl"><span class="c1"># 终端2: Gateway（WebSocket + TCP 双协议）</span>
-</span></span><span class="line"><span class="cl">./bin/gateway -listen <span class="s2">&#34;websocket://0.0.0.0:7272,tcp://0.0.0.0:7273&#34;</span> -key <span class="s2">&#34;my-secret-key&#34;</span> -register <span class="s2">&#34;127.0.0.1:51234&#34;</span>
+</span></span><span class="line"><span class="cl">./bin/gateway -listen <span class="s2">&#34;ws://0.0.0.0:7272,tcp://0.0.0.0:7273&#34;</span> -key <span class="s2">&#34;my-secret-key&#34;</span> -register <span class="s2">&#34;127.0.0.1:51234&#34;</span>
 </span></span><span class="line"><span class="cl">
 </span></span><span class="line"><span class="cl"><span class="c1"># 终端3: Worker（内置 echo 示例）</span>
 </span></span><span class="line"><span class="cl">./bin/worker -key <span class="s2">&#34;my-secret-key&#34;</span> -register <span class="s2">&#34;127.0.0.1:51234&#34;</span>
@@ -244,13 +244,13 @@
 <td>Register</td>
 </tr>
 <tr>
-<td><code>websocket://</code></td>
-<td>WebSocket 协议</td>
+<td><code>ws://</code></td>
+<td>WebSocket 明文</td>
 <td>Gateway</td>
 </tr>
 <tr>
-<td><code>ws://</code></td>
-<td>WebSocket 简写</td>
+<td><code>wss://</code></td>
+<td>WebSocket + TLS（需配置 <code>-tls-cert</code> / <code>-tls-key</code>）</td>
 <td>Gateway</td>
 </tr>
 <tr>
@@ -275,16 +275,22 @@
 </tr>
 </tbody>
 </table>
-<p>不带前缀时，Register 默认 text，Gateway 默认 websocket。</p>
+<p>不带前缀时，Register 默认 text，Gateway 默认 ws（明文 WebSocket）。</p>
 <p><strong>Gateway 多协议监听</strong>（逗号分隔）：</p>
-<pre class="chroma"><code><span class="line"><span class="cl"><span class="c1"># 同时监听 WebSocket 和 TCP</span>
-</span></span><span class="line"><span class="cl">./gateway -listen <span class="s2">&#34;websocket://0.0.0.0:7272,tcp://0.0.0.0:7273&#34;</span> -key <span class="s2">&#34;xxx&#34;</span>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="c1"># 同时监听 WS 和 TCP</span>
+</span></span><span class="line"><span class="cl">./gateway -listen <span class="s2">&#34;ws://0.0.0.0:7272,tcp://0.0.0.0:7273&#34;</span> -key <span class="s2">&#34;xxx&#34;</span>
 </span></span><span class="line"><span class="cl">
-</span></span><span class="line"><span class="cl"><span class="c1"># 只开 WebSocket</span>
+</span></span><span class="line"><span class="cl"><span class="c1"># 只开 WS</span>
 </span></span><span class="line"><span class="cl">./gateway -listen <span class="s2">&#34;ws://0.0.0.0:7272&#34;</span> -key <span class="s2">&#34;xxx&#34;</span>
 </span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># 开启 WSS（需要证书）</span>
+</span></span><span class="line"><span class="cl">./gateway -listen <span class="s2">&#34;wss://0.0.0.0:7443&#34;</span> -tls-cert cert.pem -tls-key key.pem -key <span class="s2">&#34;xxx&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># WS + WSS 双协议同时监听</span>
+</span></span><span class="line"><span class="cl">./gateway -listen <span class="s2">&#34;ws://0.0.0.0:7272,wss://0.0.0.0:7443&#34;</span> -tls-cert cert.pem -tls-key key.pem -key <span class="s2">&#34;xxx&#34;</span>
+</span></span><span class="line"><span class="cl">
 </span></span><span class="line"><span class="cl"><span class="c1"># 使用自定义协议（需在代码中先 RegisterProtocol）</span>
-</span></span><span class="line"><span class="cl">./gateway -listen <span class="s2">&#34;websocket://0.0.0.0:7272,jsonNL://0.0.0.0:7273&#34;</span> -key <span class="s2">&#34;xxx&#34;</span>
+</span></span><span class="line"><span class="cl">./gateway -listen <span class="s2">&#34;ws://0.0.0.0:7272,jsonNL://0.0.0.0:7273&#34;</span> -key <span class="s2">&#34;xxx&#34;</span>
 </span></span></code></pre><hr>
 <h2 id="-tcp-">自定义 TCP 协议</h2>
 <p>Gateway 支持自定义 TCP 应用层协议，参考 PHP Workerman 的 <code>ProtocolInterface</code> 设计。</p>
@@ -351,7 +357,7 @@
 </span></span><span class="line"><span class="cl">./bin/gateway-edit -listen <span class="s2">&#34;jsonNL://0.0.0.0:7273&#34;</span> -key <span class="s2">&#34;my-secret-key&#34;</span> -register <span class="s2">&#34;127.0.0.1:51234&#34;</span>
 </span></span><span class="line"><span class="cl">
 </span></span><span class="line"><span class="cl"><span class="c1"># 或者 WebSocket + 自定义协议双监听</span>
-</span></span><span class="line"><span class="cl">./bin/gateway-edit -listen <span class="s2">&#34;websocket://0.0.0.0:7272,jsonNL://0.0.0.0:7273&#34;</span> -key <span class="s2">&#34;my-secret-key&#34;</span> -register <span class="s2">&#34;127.0.0.1:51234&#34;</span>
+</span></span><span class="line"><span class="cl">./bin/gateway-edit -listen <span class="s2">&#34;ws://0.0.0.0:7272,jsonNL://0.0.0.0:7273&#34;</span> -key <span class="s2">&#34;my-secret-key&#34;</span> -register <span class="s2">&#34;127.0.0.1:51234&#34;</span>
 </span></span><span class="line"><span class="cl">
 </span></span><span class="line"><span class="cl"><span class="c1"># 或者使用内置 text 协议（无需自定义，标准 gateway 也支持）</span>
 </span></span><span class="line"><span class="cl">./bin/gateway -listen <span class="s2">&#34;text://0.0.0.0:7273&#34;</span> -key <span class="s2">&#34;my-secret-key&#34;</span> -register <span class="s2">&#34;127.0.0.1:51234&#34;</span>
@@ -377,29 +383,34 @@
 <table>
 <thead>
 <tr>
-<th>协议名</th>
+<th>协议前缀</th>
 <th>包格式</th>
 <th>说明</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>websocket</code></td>
+<td><code>ws://</code></td>
 <td>WebSocket 帧</td>
-<td>WebSocket 协议，支持 <code>websocket://</code> 和 <code>ws://</code></td>
+<td>WebSocket 明文连接</td>
 </tr>
 <tr>
-<td><code>tcp</code></td>
+<td><code>wss://</code></td>
+<td>WebSocket 帧 + TLS</td>
+<td>WebSocket 加密连接，需配置 <code>-tls-cert</code> / <code>-tls-key</code></td>
+</tr>
+<tr>
+<td><code>tcp://</code></td>
 <td><code>[4B body长度][body]</code></td>
 <td>4字节大端 <strong>body 长度</strong> + body，Go 版默认 TCP 协议</td>
 </tr>
 <tr>
-<td><code>frame</code></td>
+<td><code>frame://</code></td>
 <td><code>[4B 总包长][body]</code></td>
 <td>4字节大端 <strong>总包长</strong>(含头) + body，与 PHP Workerman frame 一致</td>
 </tr>
 <tr>
-<td><code>text</code></td>
+<td><code>text://</code></td>
 <td><code>数据\n</code></td>
 <td>换行符 <code>\n</code> 分隔的文本协议，适合 telnet 调试</td>
 </tr>
@@ -478,7 +489,7 @@
 <tbody>
 <tr>
 <td><code>-listen</code></td>
-<td><code>websocket://0.0.0.0:7272</code></td>
+<td><code>ws://0.0.0.0:7272</code></td>
 <td>监听地址，逗号分隔多个</td>
 </tr>
 <tr>
@@ -505,6 +516,16 @@
 <td><code>-key</code></td>
 <td><code>&quot;&quot;</code></td>
 <td>认证密钥</td>
+</tr>
+<tr>
+<td><code>-tls-cert</code></td>
+<td><code>&quot;&quot;</code></td>
+<td>TLS 证书文件（PEM 格式），<code>wss://</code> 时必填</td>
+</tr>
+<tr>
+<td><code>-tls-key</code></td>
+<td><code>&quot;&quot;</code></td>
+<td>TLS 私钥文件（PEM 格式），<code>wss://</code> 时必填</td>
 </tr>
 <tr>
 <td><code>-ping-interval</code></td>
@@ -959,7 +980,38 @@
 </span></span></code></pre><h3 id="-worker-">多 Worker 实例</h3>
 <pre class="chroma"><code><span class="line"><span class="cl">./worker -name <span class="s2">&#34;worker&#34;</span> -id <span class="m">0</span> -key <span class="s2">&#34;xxx&#34;</span>
 </span></span><span class="line"><span class="cl">./worker -name <span class="s2">&#34;worker&#34;</span> -id <span class="m">1</span> -key <span class="s2">&#34;xxx&#34;</span>
-</span></span></code></pre>
+</span></span></code></pre><hr>
+<h2 id="wss--tls-">WSS / TLS 部署</h2>
+<p>Gateway 原生支持 WSS，无需前置反代。</p>
+<h3 id="heading-21">生成自签证书（测试用）</h3>
+<pre class="chroma"><code><span class="line"><span class="cl">openssl req -x509 -newkey rsa:2048 -nodes <span class="se">\
+</span></span></span><span class="line"><span class="cl">  -keyout key.pem -out cert.pem <span class="se">\
+</span></span></span><span class="line"><span class="cl">  -days <span class="m">365</span> -subj <span class="s2">&#34;/CN=localhost&#34;</span>
+</span></span></code></pre><h3 id="-tls--gateway">启动带 TLS 的 Gateway</h3>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="c1"># 纯 WSS</span>
+</span></span><span class="line"><span class="cl">./gateway -listen <span class="s2">&#34;wss://0.0.0.0:7443&#34;</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl">          -tls-cert cert.pem -tls-key key.pem <span class="se">\
+</span></span></span><span class="line"><span class="cl">          -key <span class="s2">&#34;my-secret-key&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># WS + WSS 双端口（兼容旧客户端）</span>
+</span></span><span class="line"><span class="cl">./gateway -listen <span class="s2">&#34;ws://0.0.0.0:7272,wss://0.0.0.0:7443&#34;</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl">          -tls-cert cert.pem -tls-key key.pem <span class="se">\
+</span></span></span><span class="line"><span class="cl">          -key <span class="s2">&#34;my-secret-key&#34;</span>
+</span></span></code></pre><h3 id="heading-22">客户端连接</h3>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="c1">// 浏览器
+</span></span></span><span class="line"><span class="cl"><span class="kr">const</span> <span class="nx">ws</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">WebSocket</span><span class="p">(</span><span class="s1">&#39;wss://yourdomain.com:7443&#39;</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl"><span class="nx">ws</span><span class="p">.</span><span class="nx">onopen</span> <span class="o">=</span> <span class="p">()</span> <span class="p">=&gt;</span> <span class="nx">ws</span><span class="p">.</span><span class="nx">send</span><span class="p">(</span><span class="s1">&#39;Hello WSS!&#39;</span><span class="p">);</span>
+</span></span></code></pre><h3 id="heading-23">注意事项</h3>
+<blockquote>
+<p>[!NOTE]
+使用自签证书时浏览器会拒绝 WSS 连接。生产环境请使用 Let's Encrypt 或商业证书。
+Caddy 可自动申请并续期 Let's Encrypt 证书，是最简单的生产方案：</p>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="gh">wss.yourdomain.com</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">reverse_proxy</span> <span class="n">localhost</span><span class="p">:</span><span class="mi">7272</span><span class="c1">   # 反代到 ws:// Gateway
+</span></span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre><p>也可以继续使用 Nginx 作为 TLS 终止层，Gateway 本身监听 <code>ws://</code>，对外由 Nginx 暴露 <code>wss://</code>。两种方式均支持，按运维习惯选择。</p>
+</blockquote>
+
         </div>
     </div>
     <script>

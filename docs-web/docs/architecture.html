@@ -345,7 +345,7 @@
 <p><strong>对外连接（客户端）</strong>：</p>
 <ul>
 <li>同时支持 <strong>WebSocket</strong> 和 <strong>TCP</strong>（4字节长度头协议）</li>
-<li>监听地址支持 URI 格式：<code>websocket://0.0.0.0:7272</code>、<code>tcp://0.0.0.0:7273</code>、<code>ws://0.0.0.0:7272</code></li>
+<li>监听地址支持 URI 格式：<code>ws://0.0.0.0:7272</code>（明文）、<code>wss://0.0.0.0:7443</code>（TLS）、<code>tcp://0.0.0.0:7273</code></li>
 <li>支持逗号分隔同时监听多个地址</li>
 <li>为每个客户端分配全局唯一的 <code>connection_id</code>（uint32，最大约 42.9 亿）</li>
 <li>维护 session、UID 绑定、Group 分组等状态</li>

@@ -217,9 +217,14 @@
 </thead>
 <tbody>
 <tr>
-<td><code>websocket://</code> / <code>ws://</code></td>
-<td>WebSocket</td>
+<td><code>ws://</code></td>
+<td>WebSocket（明文）</td>
 <td><code>ws://0.0.0.0:7272</code></td>
+</tr>
+<tr>
+<td><code>wss://</code></td>
+<td>WebSocket over TLS</td>
+<td><code>wss://0.0.0.0:7443</code></td>
 </tr>
 <tr>
 <td><code>tcp://</code> / <code>frame://</code></td>
@@ -250,12 +255,12 @@
 </thead>
 <tbody>
 <tr>
-<td><code>random</code></td>
-<td>随机选择（默认）</td>
+<td><code>least_connections</code></td>
+<td>最少连接数优先（默认）</td>
 </tr>
 <tr>
-<td><code>least_connections</code></td>
-<td>最少连接数优先</td>
+<td><code>random</code></td>
+<td>随机选择</td>
 </tr>
 </tbody>
 </table>
