@@ -41,7 +41,7 @@
 | `tcp://` (LengthField) | 10MB body | 4 字节头存 body 长度，body > 10MB 断开 |
 | `frame://` | 10MB 总包长 | 4 字节头存总长，总长 > 10MB 断开 |
 | `text://` | 10MB 单行 | 无换行符且缓冲区 > 10MB 断开 |
-| `ws://` (WebSocket) | **无框架限制** | 受 gorilla/websocket 默认限制，需注意 |
+| `ws://` / `wss://` (WebSocket) | **512MB**（gorilla 默认 ReadLimit） | 实际建议远低于此；wss:// 在此基础上增加 TLS 层 |
 
 ### 实际建议
 

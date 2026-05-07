@@ -10,7 +10,7 @@
 // 使用:
 //
 //	./gateway-edit -listen "jsonNL://0.0.0.0:7273" -key "your-secret"
-//	./gateway-edit -listen "websocket://0.0.0.0:7272,jsonNL://0.0.0.0:7273" -key "your-secret"
+//	./gateway-edit -listen "ws://0.0.0.0:7272,jsonNL://0.0.0.0:7273" -key "your-secret"
 //	./gateway-edit -listen "text://0.0.0.0:7273" -key "your-secret"
 //
 // 测试（telnet）:
@@ -78,7 +78,7 @@ func (p *JsonNLProtocol) Encode(data []byte) []byte {
 }
 
 func main() {
-	listen := flag.String("listen", "jsonNL://0.0.0.0:7273", "监听地址，逗号分隔多个。支持: websocket:// ws:// tcp:// frame:// text:// jsonNL:// 或其他已注册协议")
+	listen := flag.String("listen", "jsonNL://0.0.0.0:7273", "监听地址，逗号分隔多个。支持: ws:// wss:// tcp:// frame:// text:// jsonNL:// 或其他已注册协议")
 	lanIP := flag.String("lan-ip", "127.0.0.1", "内网通讯 IP")
 	startPort := flag.Int("start-port", 54321, "内部通讯起始端口")
 	instanceID := flag.Int("id", 0, "实例 ID")
@@ -97,8 +97,7 @@ func main() {
 	gateway.RegisterProtocol("jsonNL", &JsonNLProtocol{})
 
 	log.Println("[gateway-edit] 已注册自定义协议: jsonNL")
-	log.Printf("[gateway-edit] 可用的内置协议: websocket, ws, tcp, frame, text")
-	log.Printf("[gateway-edit] 已注册自定义协议: jsonNL")
+	log.Printf("[gateway-edit] 内置协议: ws wss tcp frame text（如需 wss 请参考 cmd/gateway/main.go 加入 -tls-cert/-tls-key flag）")
 
 	g := gateway.New(&gateway.Config{
 		ListenAddrs:          strings.Split(*listen, ","),

@@ -21,28 +21,34 @@ import (
 
 // listenEntry 解析后的监听地址条目
 type listenEntry struct {
-	Protocol      string         // "websocket" 或自定义协议名
-	Addr          string         // "0.0.0.0:7272"
-	ClientProto   ClientProtocol // TCP 类协议的实现（websocket 时为 nil）
+	Protocol    string         // "websocket" 或自定义协议名
+	Addr        string         // "0.0.0.0:7272"
+	TLS         bool           // true → wss:// (需提供证书)
+	ClientProto ClientProtocol // TCP 类协议的实现（websocket 时为 nil）
 }
 
 // parseListenAddr 解析监听地址
 // 支持格式:
-//   - "websocket://0.0.0.0:7272", "ws://0.0.0.0:7272" — WebSocket
+//   - "ws://0.0.0.0:7272"  — 明文 WebSocket
+//   - "wss://0.0.0.0:7443" — TLS WebSocket（需配置 TLSCertFile / TLSKeyFile）
 //   - "tcp://0.0.0.0:7273" — 默认 4 字节长度头 TCP 协议
 //   - "frame://0.0.0.0:7273" — 同 tcp
 //   - "jsonNL://0.0.0.0:7273" — 自定义协议（需先 RegisterProtocol 注册）
-//   - 不带前缀默认为 websocket
+//   - 不带前缀默认为 ws
 func parseListenAddr(addr string) listenEntry {
-	// 检查是否有 "://" 分隔符
 	if idx := strings.Index(addr, "://"); idx > 0 {
 		scheme := addr[:idx]
 		hostPort := addr[idx+3:]
 		schemeLower := strings.ToLower(scheme)
 
-		// WebSocket 系列
-		if schemeLower == "websocket" || schemeLower == "ws" {
+		// 明文 WebSocket
+		if schemeLower == "ws" {
 			return listenEntry{Protocol: "websocket", Addr: hostPort}
+		}
+
+		// TLS WebSocket
+		if schemeLower == "wss" {
+			return listenEntry{Protocol: "websocket", Addr: hostPort, TLS: true}
 		}
 
 		// 从注册表查找 TCP 类协议
@@ -56,7 +62,7 @@ func parseListenAddr(addr string) listenEntry {
 		return listenEntry{Protocol: scheme, Addr: hostPort, ClientProto: defaultProto}
 	}
 
-	// 不带前缀默认 websocket
+	// 不带前缀默认 ws
 	return listenEntry{Protocol: "websocket", Addr: addr}
 }
 
@@ -72,53 +78,63 @@ type ClientConnection struct {
 }
 
 type Gateway struct {
-	ListenAddrs  []string // 支持: "websocket://0.0.0.0:7272", "tcp://0.0.0.0:7273", "自定义协议://..."
-	LanIP        string
-	LanPort      int
-	StartPort    int
-	InstanceID   int
-	RegisterAddr []string
-	SecretKey    string
-	PingInterval int
+	ListenAddrs          []string // 支持: "ws://0.0.0.0:7272", "wss://0.0.0.0:7443", "tcp://0.0.0.0:7273", "自定义协议://..."
+	LanIP                string
+	LanPort              int
+	StartPort            int
+	InstanceID           int
+	RegisterAddr         []string
+	SecretKey            string
+	PingInterval         int
 	PingNotResponseLimit int
-	PingData     string
-	RouterMode   RouterMode
+	PingData             string
+	RouterMode           RouterMode
 
-	aesKey          []byte
-	router          *Router
-	clientConns     map[uint32]*ClientConnection
-	uidConns        map[string]map[uint32]*ClientConnection
-	groupConns      map[string]map[uint32]*ClientConnection
-	workerConns     map[string]net.Conn
-	connIDCounter   uint32
-	mu              sync.RWMutex
-	gatewayPort     int
-	startTime       time.Time
-	stopCh          chan struct{}
-	upgrader        websocket.Upgrader
+	aesKey        []byte
+	pingDataBytes []byte  // PingData 预编码为 []byte，避免 ping() 每次转换
+	tlsCertFile   string
+	tlsKeyFile    string
+	router        *Router
+	clientConns   map[uint32]*ClientConnection
+	uidConns      map[string]map[uint32]*ClientConnection
+	groupConns    map[string]map[uint32]*ClientConnection
+	workerConns   map[string]net.Conn
+	connIDCounter uint32
+	mu            sync.RWMutex
+	gatewayPort   int
+	startTime     time.Time
+	stopCh        chan struct{}
+	upgrader      websocket.Upgrader
 }
 
 func New(cfg *Config) *Gateway {
+	var pingDataBytes []byte
+	if cfg.PingData != "" {
+		pingDataBytes = []byte(cfg.PingData)
+	}
 	g := &Gateway{
-		ListenAddrs:  cfg.ListenAddrs,
-		LanIP:        cfg.LanIP,
-		LanPort:      cfg.StartPort + cfg.InstanceID,
-		StartPort:    cfg.StartPort,
-		InstanceID:   cfg.InstanceID,
-		RegisterAddr: cfg.RegisterAddr,
-		SecretKey:    cfg.SecretKey,
-		PingInterval: cfg.PingInterval,
+		ListenAddrs:          cfg.ListenAddrs,
+		LanIP:                cfg.LanIP,
+		LanPort:              cfg.StartPort + cfg.InstanceID,
+		StartPort:            cfg.StartPort,
+		InstanceID:           cfg.InstanceID,
+		RegisterAddr:         cfg.RegisterAddr,
+		SecretKey:            cfg.SecretKey,
+		PingInterval:         cfg.PingInterval,
 		PingNotResponseLimit: cfg.PingNotResponseLimit,
-		PingData:     cfg.PingData,
-		RouterMode:   cfg.RouterMode,
-		aesKey:       crypto.DeriveKey(cfg.SecretKey),
-		router:       NewRouter(cfg.RouterMode),
-		clientConns:  make(map[uint32]*ClientConnection),
-		uidConns:     make(map[string]map[uint32]*ClientConnection),
-		groupConns:   make(map[string]map[uint32]*ClientConnection),
-		workerConns:  make(map[string]net.Conn),
-		stopCh:       make(chan struct{}),
-		upgrader:     websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }},
+		PingData:             cfg.PingData,
+		RouterMode:           cfg.RouterMode,
+		aesKey:               crypto.DeriveKey(cfg.SecretKey),
+		pingDataBytes:        pingDataBytes,
+		tlsCertFile:          cfg.TLSCertFile,
+		tlsKeyFile:           cfg.TLSKeyFile,
+		router:               NewRouter(cfg.RouterMode),
+		clientConns:          make(map[uint32]*ClientConnection),
+		uidConns:             make(map[string]map[uint32]*ClientConnection),
+		groupConns:           make(map[string]map[uint32]*ClientConnection),
+		workerConns:          make(map[string]net.Conn),
+		stopCh:               make(chan struct{}),
+		upgrader:             websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }},
 	}
 	if g.LanIP == "" {
 		g.LanIP = "127.0.0.1"
@@ -131,7 +147,7 @@ func New(cfg *Config) *Gateway {
 }
 
 type Config struct {
-	ListenAddrs          []string // 如 ["websocket://0.0.0.0:7272", "tcp://0.0.0.0:7273", "jsonNL://0.0.0.0:7274"]
+	ListenAddrs          []string // 如 ["ws://0.0.0.0:7272", "wss://0.0.0.0:7443", "tcp://0.0.0.0:7273", "jsonNL://0.0.0.0:7274"]
 	LanIP                string
 	StartPort            int
 	InstanceID           int
@@ -141,6 +157,8 @@ type Config struct {
 	PingNotResponseLimit int
 	PingData             string
 	RouterMode           RouterMode
+	TLSCertFile          string // wss:// 时必填，PEM 格式证书文件路径
+	TLSKeyFile           string // wss:// 时必填，PEM 格式私钥文件路径
 }
 
 func (g *Gateway) Run() error {
@@ -168,16 +186,18 @@ func (g *Gateway) Run() error {
 		entry := parseListenAddr(raw)
 
 		if entry.Protocol == "websocket" {
-			// WebSocket 监听
-			log.Printf("[Gateway] WebSocket listening on websocket://%s", entry.Addr)
-			mux := http.NewServeMux()
-			mux.HandleFunc("/", g.handleWebSocket)
-			server := &http.Server{Addr: entry.Addr, Handler: mux}
-			go func(s *http.Server) {
-				if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-					log.Printf("[Gateway] WebSocket server error: %v", err)
+			if entry.TLS {
+				// WSS（WebSocket over TLS）
+				if g.tlsCertFile == "" || g.tlsKeyFile == "" {
+					return fmt.Errorf("[Gateway] wss://%s requires -tls-cert and -tls-key", entry.Addr)
 				}
-			}(server)
+				log.Printf("[Gateway] WSS (TLS) listening on wss://%s", entry.Addr)
+				g.startWebSocketServer(entry.Addr, g.tlsCertFile, g.tlsKeyFile)
+			} else {
+				// WS（明文 WebSocket）
+				log.Printf("[Gateway] WS listening on ws://%s", entry.Addr)
+				g.startWebSocketServer(entry.Addr, "", "")
+			}
 		} else if entry.ClientProto != nil {
 			// TCP 类协议监听（内置 tcp/frame 或自定义协议）
 			tcpLn, err := net.Listen("tcp", entry.Addr)
@@ -196,6 +216,25 @@ func (g *Gateway) Run() error {
 }
 
 func (g *Gateway) Stop() { close(g.stopCh) }
+
+// startWebSocketServer 启动一个 WebSocket HTTP 服务器。
+// certFile/keyFile 非空时使用 TLS（wss://），否则明文（ws://）。
+func (g *Gateway) startWebSocketServer(addr, certFile, keyFile string) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", g.handleWebSocket)
+	server := &http.Server{Addr: addr, Handler: mux}
+	go func() {
+		var err error
+		if certFile != "" {
+			err = server.ListenAndServeTLS(certFile, keyFile)
+		} else {
+			err = server.ListenAndServe()
+		}
+		if err != nil && err != http.ErrServerClosed {
+			log.Printf("[Gateway] WebSocket server (%s) error: %v", addr, err)
+		}
+	}()
+}
 
 func (g *Gateway) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	wsConn, err := g.upgrader.Upgrade(w, r, nil)
@@ -576,14 +615,14 @@ func (g *Gateway) ping() {
 			continue
 		}
 		conn.PingNotRespCount++
-		if g.PingData != "" {
+		if len(g.pingDataBytes) > 0 {
 			if conn.PingNotRespCount == 0 {
 				continue
 			}
 			if g.PingNotResponseLimit > 0 && conn.PingNotRespCount%2 == 1 {
 				continue
 			}
-			conn.Conn.Write([]byte(g.PingData))
+			conn.Conn.Write(g.pingDataBytes)
 		}
 	}
 }
@@ -604,11 +643,16 @@ func (g *Gateway) pingWorkerLoop() {
 		case <-g.stopCh:
 			return
 		case <-ticker.C:
+			// 在锁内快照连接列表，锁外发送，避免持锁执行 Write I/O
 			g.mu.RLock()
+			targets := make([]net.Conn, 0, len(g.workerConns))
 			for _, wconn := range g.workerConns {
-				g.sendEncrypted(wconn, pingPayload)
+				targets = append(targets, wconn)
 			}
 			g.mu.RUnlock()
+			for _, wconn := range targets {
+				g.sendEncrypted(wconn, pingPayload)
+			}
 		}
 	}
 }

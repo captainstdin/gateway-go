@@ -89,10 +89,11 @@ client_id = hex(local_ip[4B] + local_port[2B] + connection_id[4B]) = 20 字符
 ## 五、加密通讯的分层
 
 ```
-外部客户端 → Gateway    : WebSocket/TCP 明文协议（仅应用层协议编解码）
-Gateway ↔ Worker       : GatewayProtocol 二进制 + AES-256-CBC 全包加密
-Gateway ↔ GatewaySDK   : 同上
-所有组件 ↔ Register     : JSON + AES-256-CBC + Base64 + \n 文本行协议
+外部客户端 →(ws://)  Gateway    : WebSocket 明文（仅应用层协议编解码）
+外部客户端 →(wss://) Gateway    : WebSocket + TLS（由 Go net/http 底层 tls.Listener 完成）
+Gateway ↔ Worker               : GatewayProtocol 二进制 + AES-256-CBC 全包加密
+Gateway ↔ GatewaySDK           : 同上
+所有组件 ↔ Register             : JSON + AES-256-CBC + Base64 + \n 文本行协议
 ```
 
 ### 密钥
@@ -134,9 +135,9 @@ aesKey = sha256(secretKey)  // 32 字节，直接作为 AES-256 密钥
 
 ### Gateway ↔ Worker
 
-Worker 每 25 秒发一次 `CMD_PING`，Gateway 回复 `CMD_PING`。
+Gateway 每 25 秒向所有已连接的 Worker 发一次 `CMD_PING`，Worker 回复 `CMD_PING`。
 
-> 📁 `pkg/gateway/gateway.go` 的 `pingWorkerLoop` 使用预编码的心跳包，避免循环内重复分配。
+> 📁 `pkg/gateway/gateway.go` 的 `pingWorkerLoop` 预编码心跳包（避免循环内重复分配），并先在锁内快照连接列表再锁外发送（避免持锁执行 Write I/O）。
 
 ---
 
@@ -193,8 +194,8 @@ pkg/
 3. **Dashboard 状态依赖内存**：统计数据非持久化。
    - 后续方向：可接 Prometheus 指标导出
 
-4. **无 TLS 支持**：当前 WebSocket/TCP 客户端连接是明文。
-   - 可在前端加 Nginx/Caddy 做 TLS 终止
+4. **WSS 原生支持**：Gateway 通过 `wss://` scheme + `-tls-cert` / `-tls-key` 参数原生支持 TLS，底层使用 `http.Server.ListenAndServeTLS`（Go 标准库，零额外依赖）。
+   - 也可继续使用前置 Nginx/Caddy 做 TLS 终止，两种方式均支持。
 
 ### 后续可扩展方向
 

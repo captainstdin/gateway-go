@@ -25,7 +25,8 @@ Gateway 支持同时监听多种协议：
 
 | 协议前缀 | 说明 | 示例 |
 |---|---|---|
-| `websocket://` / `ws://` | WebSocket | `ws://0.0.0.0:7272` |
+| `ws://` | WebSocket（明文） | `ws://0.0.0.0:7272` |
+| `wss://` | WebSocket over TLS | `wss://0.0.0.0:7443` |
 | `tcp://` / `frame://` | 4 字节长度头 TCP | `tcp://0.0.0.0:7273` |
 | 自定义协议名 | 需提前 `RegisterProtocol` | `text://0.0.0.0:7274` |
 
@@ -45,8 +46,8 @@ Gateway 通过 Router 选择将客户端消息转发给哪个 Worker：
 
 | 模式 | 说明 |
 |---|---|
-| `random` | 随机选择（默认） |
-| `least_connections` | 最少连接数优先 |
+| `least_connections` | 最少连接数优先（默认） |
+| `random` | 随机选择 |
 
 客户端首次消息绑定到某个 Worker 后，后续消息始终发往同一 Worker（连接亲和性）。
 

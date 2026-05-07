@@ -130,7 +130,7 @@ client.Close()
 
 ```go
 // 发送给单个客户端
-client.SendToClient("7f000001d4310000001", []byte("hello"))
+client.SendToClient("7f000001d43100000001", []byte("hello"))
 
 // 广播
 client.SendToAll([]byte(`{"type":"broadcast","msg":"大家好"}`))

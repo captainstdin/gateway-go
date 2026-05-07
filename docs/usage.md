@@ -20,7 +20,7 @@ go build -o bin/gateway-edit ./cmd/gateway-edit  # 自定义协议示例
 ./bin/register -listen "text://0.0.0.0:51234" -key "my-secret-key"
 
 # 终端2: Gateway（WebSocket + TCP 双协议）
-./bin/gateway -listen "websocket://0.0.0.0:7272,tcp://0.0.0.0:7273" -key "my-secret-key" -register "127.0.0.1:51234"
+./bin/gateway -listen "ws://0.0.0.0:7272,tcp://0.0.0.0:7273" -key "my-secret-key" -register "127.0.0.1:51234"
 
 # 终端3: Worker（内置 echo 示例）
 ./bin/worker -key "my-secret-key" -register "127.0.0.1:51234"
@@ -53,26 +53,32 @@ ws.onmessage = (e) => console.log('收到:', e.data);
 |---------|------|---------|
 | `text://` | 文本协议（JSON + AES + Base64） | Register |
 | `tcp://` | 文本协议（同 text://） | Register |
-| `websocket://` | WebSocket 协议 | Gateway |
-| `ws://` | WebSocket 简写 | Gateway |
+| `ws://` | WebSocket 明文 | Gateway |
+| `wss://` | WebSocket + TLS（需配置 `-tls-cert` / `-tls-key`） | Gateway |
 | `tcp://` | TCP 4字节 body 长度头协议（Go 版默认） | Gateway |
 | `frame://` | TCP 4字节总包长头协议（与 PHP Workerman frame 一致） | Gateway |
 | `text://` | 换行符分隔文本协议（与 PHP Workerman text 一致） | Gateway |
 | `自定义://` | 自定义 TCP 协议（需先注册） | Gateway |
 
-不带前缀时，Register 默认 text，Gateway 默认 websocket。
+不带前缀时，Register 默认 text，Gateway 默认 ws（明文 WebSocket）。
 
 **Gateway 多协议监听**（逗号分隔）：
 
 ```bash
-# 同时监听 WebSocket 和 TCP
-./gateway -listen "websocket://0.0.0.0:7272,tcp://0.0.0.0:7273" -key "xxx"
+# 同时监听 WS 和 TCP
+./gateway -listen "ws://0.0.0.0:7272,tcp://0.0.0.0:7273" -key "xxx"
 
-# 只开 WebSocket
+# 只开 WS
 ./gateway -listen "ws://0.0.0.0:7272" -key "xxx"
 
+# 开启 WSS（需要证书）
+./gateway -listen "wss://0.0.0.0:7443" -tls-cert cert.pem -tls-key key.pem -key "xxx"
+
+# WS + WSS 双协议同时监听
+./gateway -listen "ws://0.0.0.0:7272,wss://0.0.0.0:7443" -tls-cert cert.pem -tls-key key.pem -key "xxx"
+
 # 使用自定义协议（需在代码中先 RegisterProtocol）
-./gateway -listen "websocket://0.0.0.0:7272,jsonNL://0.0.0.0:7273" -key "xxx"
+./gateway -listen "ws://0.0.0.0:7272,jsonNL://0.0.0.0:7273" -key "xxx"
 ```
 
 ---
@@ -165,7 +171,7 @@ go build -o bin/gateway-edit ./cmd/gateway-edit
 ./bin/gateway-edit -listen "jsonNL://0.0.0.0:7273" -key "my-secret-key" -register "127.0.0.1:51234"
 
 # 或者 WebSocket + 自定义协议双监听
-./bin/gateway-edit -listen "websocket://0.0.0.0:7272,jsonNL://0.0.0.0:7273" -key "my-secret-key" -register "127.0.0.1:51234"
+./bin/gateway-edit -listen "ws://0.0.0.0:7272,jsonNL://0.0.0.0:7273" -key "my-secret-key" -register "127.0.0.1:51234"
 
 # 或者使用内置 text 协议（无需自定义，标准 gateway 也支持）
 ./bin/gateway -listen "text://0.0.0.0:7273" -key "my-secret-key" -register "127.0.0.1:51234"
@@ -199,12 +205,13 @@ gateway.RegisterProtocol("jsonNL", &JsonNLProtocol{})
 
 ### 内置协议
 
-| 协议名 | 包格式 | 说明 |
+| 协议前缀 | 包格式 | 说明 |
 |--------|--------|------|
-| `websocket` | WebSocket 帧 | WebSocket 协议，支持 `websocket://` 和 `ws://` |
-| `tcp` | `[4B body长度][body]` | 4字节大端 **body 长度** + body，Go 版默认 TCP 协议 |
-| `frame` | `[4B 总包长][body]` | 4字节大端 **总包长**(含头) + body，与 PHP Workerman frame 一致 |
-| `text` | `数据\n` | 换行符 `\n` 分隔的文本协议，适合 telnet 调试 |
+| `ws://` | WebSocket 帧 | WebSocket 明文连接 |
+| `wss://` | WebSocket 帧 + TLS | WebSocket 加密连接，需配置 `-tls-cert` / `-tls-key` |
+| `tcp://` | `[4B body长度][body]` | 4字节大端 **body 长度** + body，Go 版默认 TCP 协议 |
+| `frame://` | `[4B 总包长][body]` | 4字节大端 **总包长**(含头) + body，与 PHP Workerman frame 一致 |
+| `text://` | `数据\n` | 换行符 `\n` 分隔的文本协议，适合 telnet 调试 |
 
 ### 与 PHP Workerman 对比
 
@@ -231,12 +238,14 @@ gateway.RegisterProtocol("jsonNL", &JsonNLProtocol{})
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
-| `-listen` | `websocket://0.0.0.0:7272` | 监听地址，逗号分隔多个 |
+| `-listen` | `ws://0.0.0.0:7272` | 监听地址，逗号分隔多个 |
 | `-lan-ip` | `127.0.0.1` | 内网 IP（分布式部署时设为本机内网 IP）|
 | `-start-port` | `54321` | 内部通讯起始端口 |
 | `-id` | `0` | 实例 ID（多实例时需不同）|
 | `-register` | `127.0.0.1:51234` | Register 地址，逗号分隔多个 |
 | `-key` | `""` | 认证密钥 |
+| `-tls-cert` | `""` | TLS 证书文件（PEM 格式），`wss://` 时必填 |
+| `-tls-key` | `""` | TLS 私钥文件（PEM 格式），`wss://` 时必填 |
 | `-ping-interval` | `55` | 心跳间隔（秒），0 禁用 |
 | `-ping-limit` | `0` | 心跳未响应上限，0 不检测 |
 | `-router` | `least_connections` | 路由模式：`random` / `least_connections` |
@@ -504,3 +513,53 @@ func main() {
 ./worker -name "worker" -id 0 -key "xxx"
 ./worker -name "worker" -id 1 -key "xxx"
 ```
+
+---
+
+## WSS / TLS 部署
+
+Gateway 原生支持 WSS，无需前置反代。
+
+### 生成自签证书（测试用）
+
+```bash
+openssl req -x509 -newkey rsa:2048 -nodes \
+  -keyout key.pem -out cert.pem \
+  -days 365 -subj "/CN=localhost"
+```
+
+### 启动带 TLS 的 Gateway
+
+```bash
+# 纯 WSS
+./gateway -listen "wss://0.0.0.0:7443" \
+          -tls-cert cert.pem -tls-key key.pem \
+          -key "my-secret-key"
+
+# WS + WSS 双端口（兼容旧客户端）
+./gateway -listen "ws://0.0.0.0:7272,wss://0.0.0.0:7443" \
+          -tls-cert cert.pem -tls-key key.pem \
+          -key "my-secret-key"
+```
+
+### 客户端连接
+
+```javascript
+// 浏览器
+const ws = new WebSocket('wss://yourdomain.com:7443');
+ws.onopen = () => ws.send('Hello WSS!');
+```
+
+### 注意事项
+
+> [!NOTE]
+> 使用自签证书时浏览器会拒绝 WSS 连接。生产环境请使用 Let's Encrypt 或商业证书。
+> Caddy 可自动申请并续期 Let's Encrypt 证书，是最简单的生产方案：
+>
+> ```caddy
+> wss.yourdomain.com {
+>     reverse_proxy localhost:7272   # 反代到 ws:// Gateway
+> }
+> ```
+>
+> 也可以继续使用 Nginx 作为 TLS 终止层，Gateway 本身监听 `ws://`，对外由 Nginx 暴露 `wss://`。两种方式均支持，按运维习惯选择。
