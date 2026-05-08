@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"gatewayworker-go/pkg/crypto"
+	"adminv.myds.me/a/gatewayworker-go/pkg/crypto"
 	"log"
 	"net"
 	"net/http"

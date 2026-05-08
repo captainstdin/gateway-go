@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"gatewayworker-go/pkg/register"
+	"adminv.myds.me/a/gatewayworker-go/pkg/register"
 	"log"
 	"os"
 	"os/signal"

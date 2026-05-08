@@ -22,7 +22,7 @@ package main
 import (
 	"bytes"
 	"flag"
-	"gatewayworker-go/pkg/gateway"
+	"adminv.myds.me/a/gatewayworker-go/pkg/gateway"
 	"log"
 	"os"
 	"os/signal"

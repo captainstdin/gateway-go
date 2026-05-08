@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"gatewayworker-go/pkg/crypto"
+	"adminv.myds.me/a/gatewayworker-go/pkg/crypto"
 	"log"
 	"net"
 	"sync"

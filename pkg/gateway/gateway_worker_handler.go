@@ -3,8 +3,8 @@ package gateway
 import (
 	"encoding/binary"
 	"encoding/json"
-	gwctx "gatewayworker-go/pkg/context"
-	"gatewayworker-go/pkg/protocol"
+	gwctx "adminv.myds.me/a/gatewayworker-go/pkg/context"
+	"adminv.myds.me/a/gatewayworker-go/pkg/protocol"
 	"log"
 	"net"
 )

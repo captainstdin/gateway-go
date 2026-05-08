@@ -3,9 +3,9 @@ package gateway_api
 import (
 	"encoding/json"
 	"fmt"
-	gwctx "gatewayworker-go/pkg/context"
-	"gatewayworker-go/pkg/protocol"
-	"gatewayworker-go/pkg/worker"
+	gwctx "adminv.myds.me/a/gatewayworker-go/pkg/context"
+	"adminv.myds.me/a/gatewayworker-go/pkg/protocol"
+	"adminv.myds.me/a/gatewayworker-go/pkg/worker"
 )
 
 var bw *worker.BusinessWorker
