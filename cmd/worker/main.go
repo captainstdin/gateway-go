@@ -3,8 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"adminv.myds.me/a/gatewayworker-go/pkg/gateway_api"
-	"adminv.myds.me/a/gatewayworker-go/pkg/worker"
+	"github.com/captainstdin/gateway-go/pkg/gateway_api"
+	"github.com/captainstdin/gateway-go/pkg/worker"
 	"log"
 	"os"
 	"os/signal"

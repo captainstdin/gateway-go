@@ -50,32 +50,9 @@
 
 ## 安装
 
-> 仓库托管在公网 Gitea（`https://adminv.myds.me:3001`），无需额外鉴权。
-> Go 模块路径不能含 `:`，需通过 `git` URL 重写将请求透明转发到实际端口。
-
 ```bash
-# 1. 告诉 Go 对该域名不走公共代理/校验
-go env -w GOPRIVATE="adminv.myds.me"
-go env -w GONOSUMDB="adminv.myds.me"
-go env -w GONOSUMCHECK="adminv.myds.me"
-
-# 2. 让 git 自动将 https://adminv.myds.me/ 重定向到实际端口 3001
-git config --global url."https://adminv.myds.me:3001/".insteadOf "https://adminv.myds.me/"
-
-# 3. 安装（模块路径不含端口）
-go get adminv.myds.me/a/gatewayworker-go@latest
+go get github.com/captainstdin/gateway-go@latest
 ```
-
-> **可选**：若遇到 TLS 证书校验错误（如使用自签证书），执行：
-> ```bash
-> go env -w GOINSECURE="adminv.myds.me"
-> ```
-
-> 若使用 SSH 克隆，将上面的 `git config` 改为：
-> ```
-> [url "ssh://git@adminv.myds.me:222/"]
->     insteadOf = https://adminv.myds.me/
-> ```
 
 ---
 
@@ -90,8 +67,8 @@ import (
     "fmt"
     "log"
 
-    "adminv.myds.me/a/gatewayworker-go/pkg/gateway_api"
-    "adminv.myds.me/a/gatewayworker-go/pkg/worker"
+    "github.com/captainstdin/gateway-go/pkg/gateway_api"
+    "github.com/captainstdin/gateway-go/pkg/worker"
 )
 
 func main() {
@@ -126,10 +103,10 @@ package main
 import (
     "log"
 
-    "adminv.myds.me/a/gatewayworker-go/pkg/gateway"
-    "adminv.myds.me/a/gatewayworker-go/pkg/gateway_api"
-    "adminv.myds.me/a/gatewayworker-go/pkg/register"
-    "adminv.myds.me/a/gatewayworker-go/pkg/worker"
+    "github.com/captainstdin/gateway-go/pkg/gateway"
+    "github.com/captainstdin/gateway-go/pkg/gateway_api"
+    "github.com/captainstdin/gateway-go/pkg/register"
+    "github.com/captainstdin/gateway-go/pkg/worker"
 )
 
 func main() {
@@ -167,7 +144,7 @@ package main
 
 import (
     "fmt"
-    "adminv.myds.me/a/gatewayworker-go/pkg/gateway_sdk"
+    "github.com/captainstdin/gateway-go/pkg/gateway_sdk"
 )
 
 func main() {

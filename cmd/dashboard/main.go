@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"adminv.myds.me/a/gatewayworker-go/pkg/crypto"
+	"github.com/captainstdin/gateway-go/pkg/crypto"
 	"log"
 	"net"
 	"net/http"

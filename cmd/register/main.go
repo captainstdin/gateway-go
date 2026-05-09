@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"adminv.myds.me/a/gatewayworker-go/pkg/register"
+	"github.com/captainstdin/gateway-go/pkg/register"
 	"log"
 	"os"
 	"os/signal"

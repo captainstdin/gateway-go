@@ -1,4 +1,4 @@
-module adminv.myds.me/a/gatewayworker-go
+module github.com/captainstdin/gateway-go
 
 go 1.24.2
 
