@@ -50,27 +50,31 @@
 
 ## 安装
 
-> 仓库托管在公网 Gitea（`https://adminv.myds.me:3001`），无需额外鉴权，但由于使用了非标准端口，需配置 Go 跳过公共模块代理。
+> 仓库托管在公网 Gitea（`https://adminv.myds.me:3001`），无需额外鉴权。
+> Go 模块路径不能含 `:`，需通过 `git` URL 重写将请求透明转发到实际端口。
 
 ```bash
 # 1. 告诉 Go 对该域名不走公共代理/校验
-go env -w GOPRIVATE="adminv.myds.me:3001"
-go env -w GONOSUMDB="adminv.myds.me:3001"
-go env -w GONOSUMCHECK="adminv.myds.me:3001"
+go env -w GOPRIVATE="adminv.myds.me"
+go env -w GONOSUMDB="adminv.myds.me"
+go env -w GONOSUMCHECK="adminv.myds.me"
 
-# 2. 安装
-go get adminv.myds.me:3001/a/gatewayworker-go@latest
+# 2. 让 git 自动将 https://adminv.myds.me/ 重定向到实际端口 3001
+git config --global url."https://adminv.myds.me:3001/".insteadOf "https://adminv.myds.me/"
+
+# 3. 安装（模块路径不含端口）
+go get adminv.myds.me/a/gatewayworker-go@latest
 ```
 
 > **可选**：若遇到 TLS 证书校验错误（如使用自签证书），执行：
 > ```bash
-> go env -w GOINSECURE="adminv.myds.me:3001"
+> go env -w GOINSECURE="adminv.myds.me"
 > ```
 
-> 若使用 SSH 克隆，可在 `~/.gitconfig` 中添加 insteadOf 规则：
+> 若使用 SSH 克隆，将上面的 `git config` 改为：
 > ```
 > [url "ssh://git@adminv.myds.me:222/"]
->     insteadOf = https://adminv.myds.me:3001/
+>     insteadOf = https://adminv.myds.me/
 > ```
 
 ---
