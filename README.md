@@ -50,25 +50,27 @@
 
 ## 安装
 
-> **前提**：需配置私有仓库访问（Gitea 私有部署）
+> 仓库托管在公网 Gitea（`https://adminv.myds.me:3001`），无需额外鉴权，但由于使用了非标准端口，需配置 Go 跳过公共模块代理。
 
 ```bash
-# 1. 配置 GOPRIVATE（告诉 Go 不走公共代理/校验）
-go env -w GOPRIVATE="adminv.myds.me"
-go env -w GONOSUMDB="adminv.myds.me"
-go env -w GONOSUMCHECK="adminv.myds.me"
+# 1. 告诉 Go 对该域名不走公共代理/校验
+go env -w GOPRIVATE="adminv.myds.me:3001"
+go env -w GONOSUMDB="adminv.myds.me:3001"
+go env -w GONOSUMCHECK="adminv.myds.me:3001"
 
-# 2. （如果 Gitea 使用自签证书或 HTTP）关闭 TLS 校验
-go env -w GOINSECURE="adminv.myds.me"
-
-# 3. 安装
-go get adminv.myds.me/a/gatewayworker-go@latest
+# 2. 安装
+go get adminv.myds.me:3001/a/gatewayworker-go@latest
 ```
+
+> **可选**：若遇到 TLS 证书校验错误（如使用自签证书），执行：
+> ```bash
+> go env -w GOINSECURE="adminv.myds.me:3001"
+> ```
 
 > 若使用 SSH 克隆，可在 `~/.gitconfig` 中添加 insteadOf 规则：
 > ```
 > [url "ssh://git@adminv.myds.me:222/"]
->     insteadOf = https://adminv.myds.me/
+>     insteadOf = https://adminv.myds.me:3001/
 > ```
 
 ---
