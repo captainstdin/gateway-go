@@ -172,11 +172,12 @@ func (g *Gateway) Run() error {
 
 	// 启动内部通讯端口（供 Worker/GatewayClient 连接）
 	innerAddr := fmt.Sprintf("%s:%d", g.LanIP, g.LanPort)
+	log.Printf("[Gateway] Inner trying to listen on %s", innerAddr)
 	innerLn, err := net.Listen("tcp", innerAddr)
 	if err != nil {
-		return fmt.Errorf("inner listen failed: %w", err)
+		return fmt.Errorf("inner listen on %s failed: %w", innerAddr, err)
 	}
-	log.Printf("[Gateway] Inner listening on %s", innerAddr)
+	log.Printf("[Gateway] Inner listening on %s", innerLn.Addr().String())
 	go g.acceptWorkerConns(innerLn)
 	go g.registerToCenter()
 
