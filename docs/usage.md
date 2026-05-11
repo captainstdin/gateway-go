@@ -239,14 +239,15 @@ gateway.RegisterProtocol("jsonNL", &JsonNLProtocol{})
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
 | `-listen` | `ws://0.0.0.0:7272` | 监听地址，逗号分隔多个 |
-| `-lan-ip` | `127.0.0.1` | 本地监听 IP（内部通讯绑定地址）|
-| `-register-lan-ip` | `""` | 广播给 Register 的外部/公网 IP（默认与 `-lan-ip` 一致）|
+| `-lan-ip` | `127.0.0.1` | 内部绑定 IP（内部通讯端口监听地址）|
+| `-register-lan-ip` | `""` | 对外公布的 Gateway 地址（供 **GatewaySDK** 连接），默认与 `-lan-ip` 一致|
+| `-worker-lan-ip` | `127.0.0.1` | 供 **Worker** 连接的内部地址，默认 `127.0.0.1`；和 Gateway 同机时无需修改|
 | `-start-port` | `54321` | 内部通讯起始端口 |
 | `-id` | `0` | 实例 ID（多实例时需不同）|
 | `-register` | `127.0.0.1:51234` | Register 地址，逗号分隔多个 |
 | `-key` | `""` | 认证密钥 |
 | `-tls-cert` | `""` | TLS 证书文件（PEM 格式），`wss://` 时必填 |
-| `-tls-key` | `""` | TLS 私钥文件（PEM 格式），`wss://` 时必填 |
+| `-tls-key` | `""` | TLS 私鑰文件（PEM 格式），`wss://` 时必填 |
 | `-ping-interval` | `55` | 心跳间隔（秒），0 禁用 |
 | `-ping-limit` | `0` | 心跳未响应上限，0 不检测 |
 | `-router` | `least_connections` | 路由模式：`random` / `least_connections` |
@@ -487,15 +488,50 @@ func main() {
 
 > **注意**：跨机部署时 Gateway 必须设置 `-lan-ip` 为本机内网 IP。
 
-### 容器/NAT环境部署（强制指定外部IP）
+### 容器/NAT 环境部署（Worker 和 Gateway 居于同一機器）
 
-如果你的 Gateway 运行在 Docker 容器或云服务器 NAT 环境中，本地网卡只有内网 IP，但你需要外部网络能够连接该 Gateway 的内部通讯端口：
+这是最常见的 Docker 和公网部署场景。核心问题：**Gateway 对外公布的地址不能用于 Worker 内部通信**，否则会触发 NAT 回環超时。
+
+```
+双地址拆分设计：
+  RegisterLanIP = fnnas123.top  → 公布给外部 WebSocket 客户端
+  WorkerLanIP   = 127.0.0.1    → Worker 内部连接，不经外网
+```
 
 ```bash
-# 绑定 0.0.0.0 允许外部连接，并向 Register 广播你的公网/宿主机IP
-./gateway -listen "ws://0.0.0.0:7272" -lan-ip "0.0.0.0" -register-lan-ip "公网IP或宿主机IP" -key "xxx" \
-    -register "192.168.1.1:51234"
+# 单模块部署：Gateway + Register + Worker 在同一容器内
+./gateway \
+    -listen    "wss://0.0.0.0:7272"     \ # 对外监听
+    -lan-ip    "0.0.0.0"               \ # 内部端口绑定全网卡
+    -register-lan-ip "fnnas123.top"    \ # GatewaySDK 客户端用这个地址连接
+    # WorkerLanIP 默认 127.0.0.1，同机 Worker 不需配置
+    -key "xxx" -register "127.0.0.1:51234"
 ```
+
+**Docker Compose 示例**：
+
+```yaml
+version: '3.8'
+services:
+  go-gateway-worker:
+    restart: always
+    image: debian:bookworm
+    environment:
+      - "WS_SECRET_KEY=26e15811c5d78e41d1756d787711736f"
+      - "WS_REGISTER_ADDR=:51234"
+      - "WS_GATEWAY_ADDR=wss://:7272"
+      - "RegisterLanIP=fnnas123.top"   # GatewaySDK 外部地址
+      - "LanIP=0.0.0.0"               # 内部端口绑定地址
+      # WorkerLanIP 不设置，默认 127.0.0.1，Worker 通过内网连接 Gateway
+    ports:
+      - "7272:7272"
+      - "7270:7270"
+      - "51234:51234"
+    command: ["./go-gateway-worker"]
+```
+
+> [!IMPORTANT]
+> **不要把 `RegisterLanIP` 和 `WorkerLanIP` 设为同一个外部域名/IP**。`RegisterLanIP` 是给外部客户端用的，`WorkerLanIP` 是内部部署用的。同机部署时保持 `WorkerLanIP=127.0.0.1`（默认）即可。
 
 ### 多 Register 高可用
 

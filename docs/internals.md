@@ -203,3 +203,123 @@ pkg/
 - Prometheus metrics 导出（连接数、消息 QPS、延迟 P99）
 - 连接数限流（单 IP / 全局）
 - 消息队列集成（Kafka/NATS 作为 Worker 替代品）
+
+---
+
+## 十、Gateway 双地址注册设计
+
+### 问题背景：NAT 回环（Hairpin）
+
+Gateway 向 Register 注册时，只上报一个地址会导致矛盾：
+
+- **外部客户端**需要公网 IP/域名（如 `fnnas123.top:7270`）
+- **内部 Worker** 需要本机IP（如 `127.0.0.1:7270`）
+
+若用同一个地址，Worker 拿到公网地址后尝试连接 Gateway。在容器内部从容器自身的公网 IP 访问流量将经过 NAT 回环，大多数 NAT/防火墙不支持这种自回环，表现为 `i/o timeout`。
+
+### 解决方案：双地址注册
+
+Gateway 向 Register 同时上报两个地址：
+
+| 字段 | 配置来源 | 默认值 | 用途 |
+|------|------|--------|------|
+| `address` | `RegisterLanIP:LanPort` | 与 `LanIP` 相同 | 对外 GatewaySDK 客户端连接用 |
+| `worker_address` | `WorkerLanIP:LanPort` | `127.0.0.1:LanPort` | 内部 Worker 连接用 |
+
+Register 收到这两个地址后：
+- 向 Worker 广播 `worker_address`（`broadcast_addresses.addresses` 字段）
+- 向 GatewaySDK/Admin 广播 `address`（`sdk_addresses` / `status_update.gateways` 字段）
+
+### 内部数据结构
+
+```go
+// register/register.go
+type gatewayEntry struct {
+    SdkAddress    string // 对外地址（address 字段）
+    WorkerAddress string // 内部地址（worker_address 字段），空=SdkAddress
+}
+
+// 广播给 Worker 的消息包含两个列表
+type registerMessage struct {
+    Addresses    []string // Worker 连 Gateway 内部地址列表
+    SdkAddresses []string // GatewaySDK 连 Gateway 外部地址列表
+}
+```
+
+### Worker 端处理逻辑
+
+Worker 收到 `broadcast_addresses` 时，优先使用 `addresses`（内部地址）连接 Gateway。如果 `addresses` 为空（旧版本 Register）则 fallback 到 `sdk_addresses`：
+
+```go
+// business_worker.go
+addrs := regMsg.Addresses  // 内部地址
+if len(addrs) == 0 {
+    addrs = regMsg.SdkAddresses  // 兼容旧版本 Register
+}
+bw.onBroadcastAddresses(addrs)
+```
+
+### 向后兼容性
+
+- 旧版本 Gateway（未升级）：只上报 `address`，Register 自动 fallback `worker_address = address`
+- 旧版本 Worker（未升级）：`broadcast_addresses.addresses` 字段与以前语义一致，不受影响
+
+> 📁 实现文件：`pkg/register/register.go`（`gatewayEntry` 结构、`broadcastAddresses`）、`pkg/gateway/gateway.go`（`registerToCenter`、`maintainRegisterConn`）、`pkg/worker/business_worker.go`（`maintainRegisterConn` 中的地址解析）
+
+---
+
+## 十一、故障恢复机制
+
+### Gateway 掉线
+
+```
+Gateway TCP 断开
+    → Register 检测到（scanner.Scan() 返回 false）
+    → onClose("gateway"): 删除 gatewayConnections
+    → broadcastAddresses(nil): 向所有 Worker 广播新地址列表（已移除掉线 Gateway）
+    → Worker 收到新列表：gatewayAddrs 不再包含该地址
+    → Worker 已有连接的 TCP 断开 → scheduleReconnect → stillNeeded=false → 不重连 ✅
+```
+
+### Gateway 上线（新增/重启）
+
+```
+Gateway 连接 Register，发送 gateway_connect
+    → Register 存入 gatewayConnections
+    → broadcastAddresses(nil): 向所有 Worker 广播新地址列表（含新 Gateway）
+    → Worker 收到新列表：onBroadcastAddresses 发现新地址 → 自动发起连接 ✅
+```
+
+### Worker 掉线
+
+```
+Worker TCP 断开（Register 侧）
+    → onClose("worker"): 删除 workerConnections/workerInfos
+    → Register 不通知 Gateway（无需，Gateway 自己感知）
+
+Worker TCP 断开（Gateway 侧）
+    → handleWorkerConn 读循环退出
+    → delete(workerConns, workerKey)
+    → router.OnWorkerDisconnected(workerKey): 路由器移除该 Worker ✅
+```
+
+### Worker 上线（新增/重启）
+
+```
+Worker 连接 Register → 收到 broadcast_addresses（当前所有 Gateway 列表）
+    → onBroadcastAddresses → 逐一连接所有 Gateway ✅
+
+Worker 连接 Gateway 内部端口
+    → Gateway.acceptWorkerConns 接受连接
+    → 认证通过 → 加入 workerConns + router ✅
+```
+
+### 轻微竞态说明（无害）
+
+Gateway 掉线 → Register 广播新列表 有网络延迟。这段时间内：
+
+1. Worker 的 `scheduleReconnect` 可能先于广播触发，尝试重连死 Gateway → 连接失败
+2. 等广播到达后，`gatewayAddrs` 更新，`scheduleReconnect` 的 `stillNeeded = false`
+3. Worker 不再重连 ✅
+
+重连期间最多多尝试一次失败连接，整体无数据丢失风险。

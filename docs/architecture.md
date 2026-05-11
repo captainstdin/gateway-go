@@ -81,13 +81,13 @@ GatewayWorker-Go 采用 **Gateway + Worker 分离** 的架构，将网络 IO 与
 
 | 事件 | 发送方 | 说明 |
 |------|-------|------|
-| `gateway_connect` | Gateway | Gateway 注册，携带内部通讯地址 |
+| `gateway_connect` | Gateway | Gateway 注册，携带**两个**地址：`address`（GatewaySDK 外部地址）+ `worker_address`（Worker 内部地址）|
 | `worker_connect` | Worker | Worker 注册，携带 worker 名称 |
 | `worker_stats` | Worker | Worker 每 3 秒上报处理计数 |
 | `admin_connect` | Dashboard | 管理后台连接，订阅实时状态推送 |
 | `ping` | 任意 | 心跳保活 |
-| `broadcast_addresses` | Register | 广播 Gateway 地址列表给 Worker |
-| `status_update` | Register | 推送完整状态（gateways+workers）给 Admin |
+| `broadcast_addresses` | Register | 向 Worker 广播 Gateway **内部地址列表**（`addresses`）；同时附带外部地址列表（`sdk_addresses`）|
+| `status_update` | Register | 推送完整状态（gateways+workers）给 Admin，`gateways` 字段为外部地址列表 |
 
 **多 Register 高可用原理**：
 
@@ -118,7 +118,9 @@ Gateway 维护两类连接：
 
 **对内连接（Worker/GatewaySDK）**：
 - 监听内部 TCP 端口（`lanIP:startPort+instanceID`），使用 GatewayProtocol + AES
-- 向 Register 注册广播地址为 `registerLanIP:startPort+instanceID`（默认与 `lanIP` 相同），用于在容器或 NAT 等环境下强制指定公网/宿主机连接 IP
+- 向 Register **同时上报两个地址**：
+  - `address`（`RegisterLanIP:port`）：供外部 GatewaySDK 连接，默认与 `LanIP` 一致，NAT/容器场景下设为公网/宿主机 IP
+  - `worker_address`（`WorkerLanIP:port`）：供内部 Worker 连接，**默认 `127.0.0.1:port`**，避免 Worker 与 Gateway 同机时流量绕公网回环
 - 接收 Worker/GatewaySDK 的连接和指令（发消息、踢人、绑定UID、加入Group 等 30+ 种命令）
 
 **路由策略**：
@@ -252,12 +254,19 @@ AES Key = SHA256(SecretKey) → 32 字节
 ### 认证流程
 
 ```
-Gateway → Register:  {"event":"gateway_connect", "secret_key":"xxx", "address":"ip:port"}
+Gateway → Register:  {"event":"gateway_connect", "secret_key":"xxx",
+                      "address":"fnnas123.top:7270",         // GatewaySDK 外部地址
+                      "worker_address":"127.0.0.1:7270"}     // Worker 内部地址（同机默认）
 Worker  → Register:  {"event":"worker_connect", "secret_key":"xxx", "name":"worker:0"}
 Admin   → Register:  {"event":"admin_connect", "secret_key":"xxx"}
 Worker  → Register:  {"event":"worker_stats", "name":"worker:0", "processed_count":12345}
 Worker  → Gateway:   CMD_WORKER_CONNECT, body={"worker_key":"name:id", "secret_key":"xxx"}
 Client  → Gateway:   CMD_GATEWAY_CLIENT_CONNECT, body={"secret_key":"xxx"}
 ```
+
+Register 收到 `gateway_connect` 后：
+- 将 `worker_address` 广播给所有 Worker（`broadcast_addresses.addresses` 字段）
+- 将 `address` 广播给 GatewaySDK / Admin（`sdk_addresses` / `status_update.gateways` 字段）
+- `worker_address` 为空时自动 fallback 到 `address`（向后兼容旧版 Gateway）
 
 Register 和 Gateway 均会验证 secret_key，不匹配则立即断开连接。

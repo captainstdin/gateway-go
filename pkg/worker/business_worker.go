@@ -164,14 +164,20 @@ func (bw *BusinessWorker) maintainRegisterConn(regAddr string) {
 				continue
 			}
 			var regMsg struct {
-				Event     string   `json:"event"`
-				Addresses []string `json:"addresses"`
+				Event        string   `json:"event"`
+				Addresses    []string `json:"addresses"`     // Worker 连 Gateway 用的内部地址
+				SdkAddresses []string `json:"sdk_addresses"` // GatewaySDK 外部地址（备用）
 			}
 			if json.Unmarshal(plaintext, &regMsg) != nil {
 				continue
 			}
 			if regMsg.Event == "broadcast_addresses" {
-				bw.onBroadcastAddresses(regMsg.Addresses)
+				// 优先用 Addresses（Worker 内部地址），旧版本 Register 只发 Addresses 时也能兼容
+				addrs := regMsg.Addresses
+				if len(addrs) == 0 {
+					addrs = regMsg.SdkAddresses
+				}
+				bw.onBroadcastAddresses(addrs)
 			}
 		}
 		conn.Close()

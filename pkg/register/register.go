@@ -19,12 +19,18 @@ type Register struct {
 
 	aesKey             []byte
 	listener           net.Listener
-	gatewayConnections sync.Map // connID(int64) -> gateway内部地址(string)
+	gatewayConnections sync.Map // connID(int64) -> *gatewayEntry
 	workerConnections  sync.Map // connID(int64) -> net.Conn
 	adminConnections   sync.Map // connID(int64) -> net.Conn
 	workerInfos        sync.Map // connID(int64) -> *WorkerInfo
 	connIDCounter      int64
 	stopCh             chan struct{}
+}
+
+// gatewayEntry Gateway 上报的两类地址
+type gatewayEntry struct {
+	SdkAddress    string // 给外部 GatewaySDK 客户端连接用（RegisterLanIP:port）
+	WorkerAddress string // 给内部 Worker 连接用（WorkerLanIP:port），空时=SdkAddress
 }
 
 // WorkerInfo Worker 上报的信息
@@ -37,9 +43,11 @@ type WorkerInfo struct {
 // registerMessage 注册中心收发的 JSON 消息结构
 type registerMessage struct {
 	Event          string   `json:"event"`
-	Address        string   `json:"address,omitempty"`
+	Address        string   `json:"address,omitempty"`        // Gateway 上报：给 GatewaySDK 用的地址
+	WorkerAddress  string   `json:"worker_address,omitempty"` // Gateway 上报：给 Worker 用的内部地址，空=同 Address
 	SecretKey      string   `json:"secret_key,omitempty"`
-	Addresses      []string `json:"addresses,omitempty"`
+	Addresses      []string `json:"addresses,omitempty"`       // 广播给 Worker：Gateway 内部地址列表
+	SdkAddresses   []string `json:"sdk_addresses,omitempty"`   // 广播给 GatewaySDK：外部地址列表
 	Name           string   `json:"name,omitempty"`
 	ProcessedCount uint64   `json:"processed_count,omitempty"`
 	// admin 广播用
@@ -136,8 +144,15 @@ func (r *Register) handleConnection(conn net.Conn) {
 			}
 			authenticated = true
 			connType = "gateway"
-			r.gatewayConnections.Store(connID, msg.Address)
-			log.Printf("[Register] Gateway registered: %s (connID=%d)", msg.Address, connID)
+			entry := &gatewayEntry{
+				SdkAddress:    msg.Address,
+				WorkerAddress: msg.WorkerAddress,
+			}
+			if entry.WorkerAddress == "" {
+				entry.WorkerAddress = entry.SdkAddress
+			}
+			r.gatewayConnections.Store(connID, entry)
+			log.Printf("[Register] Gateway registered: sdk=%s worker=%s (connID=%d)", entry.SdkAddress, entry.WorkerAddress, connID)
 			r.broadcastAddresses(nil)
 			r.broadcastStatusToAdmins()
 
@@ -204,8 +219,12 @@ func (r *Register) onClose(connID int64, connType string) {
 }
 
 func (r *Register) broadcastAddresses(targetConn net.Conn) {
-	addresses := r.collectGatewayAddresses()
-	msg := registerMessage{Event: "broadcast_addresses", Addresses: addresses}
+	workerAddrs, sdkAddrs := r.collectGatewayAddresses()
+	msg := registerMessage{
+		Event:        "broadcast_addresses",
+		Addresses:    workerAddrs,  // Worker 用的内部地址
+		SdkAddresses: sdkAddrs,    // GatewaySDK 用的外部地址
+	}
 	line := r.encryptMessage(msg)
 	if line == "" {
 		return
@@ -223,11 +242,11 @@ func (r *Register) broadcastAddresses(targetConn net.Conn) {
 }
 
 func (r *Register) broadcastStatusToAdmins() {
-	gateways := r.collectGatewayAddresses()
+	_, sdkAddrs := r.collectGatewayAddresses()
 	workers := r.collectWorkerInfos()
 	msg := registerMessage{
 		Event:    "status_update",
-		Gateways: gateways,
+		Gateways: sdkAddrs, // admin 面板展示外部地址
 		Workers:  workers,
 	}
 	line := r.encryptMessage(msg)
@@ -243,11 +262,11 @@ func (r *Register) broadcastStatusToAdmins() {
 }
 
 func (r *Register) sendStatusToConn(conn net.Conn) {
-	gateways := r.collectGatewayAddresses()
+	_, sdkAddrs := r.collectGatewayAddresses()
 	workers := r.collectWorkerInfos()
 	msg := registerMessage{
 		Event:    "status_update",
-		Gateways: gateways,
+		Gateways: sdkAddrs, // admin 面板展示外部地址
 		Workers:  workers,
 	}
 	line := r.encryptMessage(msg)
@@ -256,17 +275,23 @@ func (r *Register) sendStatusToConn(conn net.Conn) {
 	}
 }
 
-func (r *Register) collectGatewayAddresses() []string {
-	addrSet := make(map[string]bool)
+// collectGatewayAddresses 返回 (workerAddrs, sdkAddrs)
+func (r *Register) collectGatewayAddresses() (workerAddrs []string, sdkAddrs []string) {
+	workerSet := make(map[string]bool)
+	sdkSet := make(map[string]bool)
 	r.gatewayConnections.Range(func(_, value interface{}) bool {
-		addrSet[value.(string)] = true
+		entry := value.(*gatewayEntry)
+		workerSet[entry.WorkerAddress] = true
+		sdkSet[entry.SdkAddress] = true
 		return true
 	})
-	addrs := make([]string, 0, len(addrSet))
-	for a := range addrSet {
-		addrs = append(addrs, a)
+	for a := range workerSet {
+		workerAddrs = append(workerAddrs, a)
 	}
-	return addrs
+	for a := range sdkSet {
+		sdkAddrs = append(sdkAddrs, a)
+	}
+	return
 }
 
 func (r *Register) collectWorkerInfos() []*WorkerInfo {

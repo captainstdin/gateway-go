@@ -5,8 +5,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"github.com/captainstdin/gateway-go/pkg/crypto"
-	"github.com/captainstdin/gateway-go/pkg/protocol"
 	"io"
 	"log"
 	"net"
@@ -15,6 +13,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/captainstdin/gateway-go/pkg/crypto"
+	"github.com/captainstdin/gateway-go/pkg/protocol"
 
 	"github.com/gorilla/websocket"
 )
@@ -80,7 +81,8 @@ type ClientConnection struct {
 type Gateway struct {
 	ListenAddrs          []string // 支持: "ws://0.0.0.0:7272", "wss://0.0.0.0:7443", "tcp://0.0.0.0:7273", "自定义协议://..."
 	LanIP                string
-	RegisterLanIP        string
+	RegisterLanIP        string   // 对外公布的地址（供 GatewaySDK 客户端连接）
+	WorkerLanIP          string   // Worker 连接内部通信口用的地址，默认 127.0.0.1
 	LanPort              int
 	StartPort            int
 	InstanceID           int
@@ -92,7 +94,7 @@ type Gateway struct {
 	RouterMode           RouterMode
 
 	aesKey        []byte
-	pingDataBytes []byte  // PingData 预编码为 []byte，避免 ping() 每次转换
+	pingDataBytes []byte // PingData 预编码为 []byte，避免 ping() 每次转换
 	tlsCertFile   string
 	tlsKeyFile    string
 	router        *Router
@@ -117,6 +119,7 @@ func New(cfg *Config) *Gateway {
 		ListenAddrs:          cfg.ListenAddrs,
 		LanIP:                cfg.LanIP,
 		RegisterLanIP:        cfg.RegisterLanIP,
+		WorkerLanIP:          cfg.WorkerLanIP,
 		LanPort:              cfg.StartPort + cfg.InstanceID,
 		StartPort:            cfg.StartPort,
 		InstanceID:           cfg.InstanceID,
@@ -144,6 +147,10 @@ func New(cfg *Config) *Gateway {
 	if g.RegisterLanIP == "" {
 		g.RegisterLanIP = g.LanIP
 	}
+	// WorkerLanIP 默认用 127.0.0.1，确保 Worker 和 Gateway 居于同一机器时不经外网回缔
+	if g.WorkerLanIP == "" {
+		g.WorkerLanIP = "127.0.0.1"
+	}
 	if g.StartPort == 0 {
 		g.StartPort = 54321
 		g.LanPort = g.StartPort + g.InstanceID
@@ -153,8 +160,9 @@ func New(cfg *Config) *Gateway {
 
 type Config struct {
 	ListenAddrs          []string // 如 ["ws://0.0.0.0:7272", "wss://0.0.0.0:7443", "tcp://0.0.0.0:7273", "jsonNL://0.0.0.0:7274"]
-	LanIP                string
-	RegisterLanIP        string
+	LanIP                string   // 内部绑定地址，用于监听 Worker/GatewayClient 连接，默认 127.0.0.1
+	RegisterLanIP        string   // 对外公布的 Gateway 地址（供外部 GatewaySDK 客户端连接）
+	WorkerLanIP          string   // 内部 Worker 连接所用的地址，默认 127.0.0.1；和 Gateway 同机时无需修改
 	StartPort            int
 	InstanceID           int
 	RegisterAddr         []string
@@ -277,7 +285,7 @@ func (g *Gateway) handleSendToAll(data *protocol.GatewayData) {
 	g.mu.RLock()
 	if data.ExtData != "" {
 		var ext struct {
-			Connections []uint32         `json:"connections,omitempty"`
+			Connections []uint32          `json:"connections,omitempty"`
 			Exclude     map[uint32]uint32 `json:"exclude,omitempty"`
 		}
 		json.Unmarshal([]byte(data.ExtData), &ext)
@@ -536,13 +544,16 @@ func (g *Gateway) handleWorkerConn(conn net.Conn) {
 // ----- Register connection -----
 
 func (g *Gateway) registerToCenter() {
-	address := fmt.Sprintf("%s:%d", g.RegisterLanIP, g.LanPort)
+	// sdkAddress: 对外 GatewaySDK 公布的地址（RegisterLanIP:port）
+	sdkAddress := fmt.Sprintf("%s:%d", g.RegisterLanIP, g.LanPort)
+	// workerAddress: 内部 Worker 连接地址（WorkerLanIP:port）
+	workerAddress := fmt.Sprintf("%s:%d", g.WorkerLanIP, g.LanPort)
 	for _, regAddr := range g.RegisterAddr {
-		go g.maintainRegisterConn(regAddr, address)
+		go g.maintainRegisterConn(regAddr, sdkAddress, workerAddress)
 	}
 }
 
-func (g *Gateway) maintainRegisterConn(regAddr, selfAddr string) {
+func (g *Gateway) maintainRegisterConn(regAddr, sdkAddr, workerAddr string) {
 	for {
 		select {
 		case <-g.stopCh:
@@ -556,7 +567,10 @@ func (g *Gateway) maintainRegisterConn(regAddr, selfAddr string) {
 			continue
 		}
 		msg, _ := json.Marshal(map[string]string{
-			"event": "gateway_connect", "address": selfAddr, "secret_key": g.SecretKey,
+			"event":          "gateway_connect",
+			"address":        sdkAddr,    // 对外 GatewaySDK 地址
+			"worker_address": workerAddr, // 内部 Worker 地址
+			"secret_key":     g.SecretKey,
 		})
 		encrypted, _ := crypto.EncryptToBase64(msg, g.aesKey)
 		conn.Write([]byte(encrypted + "\n"))
