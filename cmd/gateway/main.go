@@ -13,6 +13,7 @@ import (
 func main() {
 	listen := flag.String("listen", "ws://0.0.0.0:7272", "Listen address(es), comma separated. Supported: ws://ip:port wss://ip:port tcp://ip:port frame://ip:port text://ip:port")
 	lanIP := flag.String("lan-ip", "127.0.0.1", "LAN IP for internal communication")
+	registerLanIP := flag.String("register-lan-ip", "", "LAN IP to broadcast to Register (defaults to lan-ip)")
 	startPort := flag.Int("start-port", 54321, "Internal communication start port")
 	instanceID := flag.Int("id", 0, "Instance ID")
 	registerAddr := flag.String("register", "127.0.0.1:51234", "Register address(es), comma separated")
@@ -27,6 +28,7 @@ func main() {
 	g := gateway.New(&gateway.Config{
 		ListenAddrs:          strings.Split(*listen, ","),
 		LanIP:                *lanIP,
+		RegisterLanIP:        *registerLanIP,
 		StartPort:            *startPort,
 		InstanceID:           *instanceID,
 		RegisterAddr:         strings.Split(*registerAddr, ","),

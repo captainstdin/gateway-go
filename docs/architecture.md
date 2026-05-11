@@ -118,6 +118,7 @@ Gateway 维护两类连接：
 
 **对内连接（Worker/GatewaySDK）**：
 - 监听内部 TCP 端口（`lanIP:startPort+instanceID`），使用 GatewayProtocol + AES
+- 向 Register 注册广播地址为 `registerLanIP:startPort+instanceID`（默认与 `lanIP` 相同），用于在容器或 NAT 等环境下强制指定公网/宿主机连接 IP
 - 接收 Worker/GatewaySDK 的连接和指令（发消息、踢人、绑定UID、加入Group 等 30+ 种命令）
 
 **路由策略**：

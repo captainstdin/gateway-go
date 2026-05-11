@@ -239,7 +239,8 @@ gateway.RegisterProtocol("jsonNL", &JsonNLProtocol{})
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
 | `-listen` | `ws://0.0.0.0:7272` | 监听地址，逗号分隔多个 |
-| `-lan-ip` | `127.0.0.1` | 内网 IP（分布式部署时设为本机内网 IP）|
+| `-lan-ip` | `127.0.0.1` | 本地监听 IP（内部通讯绑定地址）|
+| `-register-lan-ip` | `""` | 广播给 Register 的外部/公网 IP（默认与 `-lan-ip` 一致）|
 | `-start-port` | `54321` | 内部通讯起始端口 |
 | `-id` | `0` | 实例 ID（多实例时需不同）|
 | `-register` | `127.0.0.1:51234` | Register 地址，逗号分隔多个 |
@@ -485,6 +486,16 @@ func main() {
 ```
 
 > **注意**：跨机部署时 Gateway 必须设置 `-lan-ip` 为本机内网 IP。
+
+### 容器/NAT环境部署（强制指定外部IP）
+
+如果你的 Gateway 运行在 Docker 容器或云服务器 NAT 环境中，本地网卡只有内网 IP，但你需要外部网络能够连接该 Gateway 的内部通讯端口：
+
+```bash
+# 绑定 0.0.0.0 允许外部连接，并向 Register 广播你的公网/宿主机IP
+./gateway -listen "ws://0.0.0.0:7272" -lan-ip "0.0.0.0" -register-lan-ip "公网IP或宿主机IP" -key "xxx" \
+    -register "192.168.1.1:51234"
+```
 
 ### 多 Register 高可用
 

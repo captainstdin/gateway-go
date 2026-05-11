@@ -125,9 +125,11 @@ reg.Run()
 
 // cmd/gateway/main.go
 gw := gateway.New(&gateway.Config{
-    ListenAddrs:  []string{"ws://0.0.0.0:7272"},
-    RegisterAddr: []string{"127.0.0.1:1236"},
-    SecretKey:    "your-secret-key",
+    ListenAddrs:   []string{"ws://0.0.0.0:7272"},
+    LanIP:         "0.0.0.0",         // 本地监听IP
+    RegisterLanIP: "127.0.0.1",       // 上报给Register的通讯IP
+    RegisterAddr:  []string{"127.0.0.1:1236"},
+    SecretKey:     "your-secret-key",
 })
 gw.Run()
 

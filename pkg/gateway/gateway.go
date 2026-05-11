@@ -80,6 +80,7 @@ type ClientConnection struct {
 type Gateway struct {
 	ListenAddrs          []string // 支持: "ws://0.0.0.0:7272", "wss://0.0.0.0:7443", "tcp://0.0.0.0:7273", "自定义协议://..."
 	LanIP                string
+	RegisterLanIP        string
 	LanPort              int
 	StartPort            int
 	InstanceID           int
@@ -115,6 +116,7 @@ func New(cfg *Config) *Gateway {
 	g := &Gateway{
 		ListenAddrs:          cfg.ListenAddrs,
 		LanIP:                cfg.LanIP,
+		RegisterLanIP:        cfg.RegisterLanIP,
 		LanPort:              cfg.StartPort + cfg.InstanceID,
 		StartPort:            cfg.StartPort,
 		InstanceID:           cfg.InstanceID,
@@ -139,6 +141,9 @@ func New(cfg *Config) *Gateway {
 	if g.LanIP == "" {
 		g.LanIP = "127.0.0.1"
 	}
+	if g.RegisterLanIP == "" {
+		g.RegisterLanIP = g.LanIP
+	}
 	if g.StartPort == 0 {
 		g.StartPort = 54321
 		g.LanPort = g.StartPort + g.InstanceID
@@ -149,6 +154,7 @@ func New(cfg *Config) *Gateway {
 type Config struct {
 	ListenAddrs          []string // 如 ["ws://0.0.0.0:7272", "wss://0.0.0.0:7443", "tcp://0.0.0.0:7273", "jsonNL://0.0.0.0:7274"]
 	LanIP                string
+	RegisterLanIP        string
 	StartPort            int
 	InstanceID           int
 	RegisterAddr         []string
@@ -359,7 +365,7 @@ func (g *Gateway) onClientConnect(cc ClientConn) *ClientConnection {
 		Conn:   cc,
 		Groups: make(map[string]bool),
 		GatewayHeader: &protocol.GatewayData{
-			LocalIP:      ipToUint32(g.LanIP),
+			LocalIP:      ipToUint32(g.RegisterLanIP),
 			LocalPort:    uint16(g.LanPort),
 			ClientIP:     ipNum,
 			ClientPort:   uint16(cc.RemotePort()),
@@ -529,7 +535,7 @@ func (g *Gateway) handleWorkerConn(conn net.Conn) {
 // ----- Register connection -----
 
 func (g *Gateway) registerToCenter() {
-	address := fmt.Sprintf("%s:%d", g.LanIP, g.LanPort)
+	address := fmt.Sprintf("%s:%d", g.RegisterLanIP, g.LanPort)
 	for _, regAddr := range g.RegisterAddr {
 		go g.maintainRegisterConn(regAddr, address)
 	}
