@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-color-mode="auto" data-light-theme="light" data-dark-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>README.md - GatewayWorker-Go 文档</title>
+    <link rel="stylesheet" href="./github-markdown.css">
+    <link rel="stylesheet" href="./chroma.css">
+    <style>
+        :root {
+            --bg-body: #ffffff;
+            --bg-sidebar: #f6f8fa;
+            --bg-sidebar-hover: #eaf0f6;
+            --border-color: #d0d7de;
+            --text-primary: #24292f;
+            --text-secondary: #57606a;
+            --link-color: #0969da;
+            --active-bg: #0969da;
+            --active-text: #ffffff;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-body: #0d1117;
+                --bg-sidebar: #161b22;
+                --bg-sidebar-hover: #21262d;
+                --border-color: #30363d;
+                --text-primary: #c9d1d9;
+                --text-secondary: #8b949e;
+                --link-color: #58a6ff;
+                --active-bg: #1f6feb;
+                --active-text: #ffffff;
+            }
+        }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+            background-color: var(--bg-body);
+            color: var(--text-primary);
+            color-scheme: light dark;
+        }
+        .sidebar {
+            width: 250px;
+            height: 100vh;
+            overflow-y: auto;
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border-color);
+            padding: 16px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            box-sizing: border-box;
+        }
+        .sidebar h3 {
+            margin-top: 1.2em;
+            margin-bottom: 0.4em;
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+        .sidebar h3 a {
+            color: inherit;
+            text-decoration: none;
+        }
+        .sidebar h3 a:hover {
+            color: var(--link-color);
+        }
+        .sidebar h3:first-child { margin-top: 0; }
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .sidebar li {
+            margin-bottom: 4px;
+        }
+        .sidebar a {
+            text-decoration: none;
+            color: var(--link-color);
+            font-size: 14px;
+            display: block;
+            padding: 6px 10px;
+            border-radius: 6px;
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+        .sidebar a:hover {
+            background-color: var(--bg-sidebar-hover);
+        }
+        .sidebar a.active {
+            background-color: var(--active-bg);
+            color: var(--active-text) !important;
+            font-weight: 500;
+        }
+        .sidebar a.active:hover {
+            background-color: var(--active-bg);
+            text-decoration: none;
+        }
+        .content {
+            margin-left: 250px;
+            padding: 24px 32px;
+            box-sizing: border-box;
+        }
+        .markdown-body {
+            box-sizing: border-box;
+            min-width: 200px;
+            max-width: 1024px;
+            margin: 0 auto;
+        }
+        .mobile-header, .backdrop {
+            display: none;
+        }
+        @media (max-width: 767px) {
+            .mobile-header {
+                display: flex;
+                align-items: center;
+                height: 54px;
+                padding: 0 16px;
+                background: var(--bg-body);
+                border-bottom: 1px solid var(--border-color);
+                position: sticky;
+                top: 0;
+                z-index: 900;
+            }
+            .mobile-title {
+                font-weight: 600;
+                margin-left: 16px;
+                font-size: 16px;
+                color: var(--text-primary);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .menu-btn {
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                color: var(--text-primary);
+            }
+            .sidebar { 
+                width: 280px; 
+                height: 100vh; 
+                position: fixed; 
+                top: 0; 
+                left: 0;
+                z-index: 1000;
+                border-right: 1px solid var(--border-color);
+                transform: translateX(-100%);
+                transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            }
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            .backdrop {
+                display: block;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background: rgba(0, 0, 0, 0.4);
+                backdrop-filter: blur(4px);
+                -webkit-backdrop-filter: blur(4px);
+                z-index: 950;
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 0.3s ease;
+            }
+            .backdrop.open {
+                opacity: 1;
+                pointer-events: auto;
+            }
+            .content { margin-left: 0; padding: 16px; }
+            .markdown-body { padding: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="mobile-header">
+        <div class="menu-btn" id="menu-btn">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+        </div>
+        <div class="mobile-title">README.md - 文档</div>
+    </div>
+    <div class="backdrop" id="backdrop"></div>
+    <div class="sidebar" id="sidebar">
+        <h3><a href="./index.html">主目录</a></h3><ul><li><a href="./README.html">README.md</a></li></ul><h3>使用文档 (docs)</h3><ul><li><a href="./docs/cheatsheet.html">cheatsheet.md</a></li><li><a href="./docs/README.html">README.md</a></li><li><a href="./docs/architecture.html">architecture.md</a></li><li><a href="./docs/usage.html">usage.md</a></li><li><a href="./docs/best-practices.html">best-practices.md</a></li><li><a href="./docs/code-usage.html">code-usage.md</a></li><li><a href="./docs/gateway-sdk.html">gateway-sdk.md</a></li><li><a href="./docs/internals.html">internals.md</a></li><li><a href="./docs/optimize2ai.html">optimize2ai.md</a></li><li><a href="./docs/php-vs-go.html">php-vs-go.md</a></li></ul><h3>包文档 (pkg)</h3><ul><li><a href="./pkg/context/README.html">pkg/context</a></li><li><a href="./pkg/crypto/README.html">pkg/crypto</a></li><li><a href="./pkg/gateway/README.html">pkg/gateway</a></li><li><a href="./pkg/gateway_api/README.html">pkg/gateway_api</a></li><li><a href="./pkg/gateway_sdk/README.html">pkg/gateway_sdk</a></li><li><a href="./pkg/protocol/README.html">pkg/protocol</a></li><li><a href="./pkg/register/README.html">pkg/register</a></li><li><a href="./pkg/worker/README.html">pkg/worker</a></li></ul>
+    </div>
+    <div class="content">
+        <div class="markdown-body">
+            <h1 id="gatewayworker-go">GatewayWorker-Go</h1>
+<p>高性能、可扩展的 Go 实时通讯框架，基于 <strong>Gateway + Worker 分离架构</strong>。<br>
+对标 PHP <a href="https://github.com/walkor/GatewayWorker">GatewayWorker</a>，支持 WebSocket / WSS / TCP 多协议，AES 加密内部通讯，开箱即用。</p>
+<hr>
+<h2 id="heading">架构</h2>
+<pre><code>                         ┌──────────────────┐
+                         │     Register     │  服务发现 &amp; 地址广播
+                         └─┬──────┬──────┬──┘
+              注册/发现     │      │      │     发现 Gateway 地址
+         ┌─────────────────┘      │      └────────────────────┐
+         ▼                        │                           ▼
+┌─────────────────┐               │              ┌─────────────────────┐
+│    Gateway      │               │              │    GatewaySDK       │
+│  管理客户端连接  │               │              │  外部进程主动推送    │
+└──┬──────────┬───┘               │              └──────────┬──────────┘
+   │          │ 内部 AES 加密通讯  │                        │
+   │ WS/TCP   └───────────────────▼─────────────────────────┘
+   ▼                   ┌────────────────────┐
+┌──────┐               │   BusinessWorker   │  业务逻辑 / 事件回调
+│Client│               └────────────────────┘
+└──────┘
+</code></pre>
+<p><strong>数据流：</strong></p>
+<ul>
+<li><strong>被动事件</strong>：Client → Gateway → Worker 触发 <code>OnConnect</code> / <code>OnMessage</code> / <code>OnClose</code></li>
+<li><strong>Worker 内推送</strong>：回调中调用 <code>gateway_api.SendToXxx()</code> → Gateway → Client</li>
+<li><strong>外部推送</strong>：<code>GatewaySDK</code> 连接 Register 发现 Gateway → 发送指令 → Client</li>
+</ul>
+<hr>
+<h2 id="heading-1">特性</h2>
+<ul>
+<li>🔌 <strong>Gateway / Worker 分离</strong> — 重启 Worker 不影响客户端连接（热更新业务逻辑）</li>
+<li>🌐 <strong>多协议支持</strong> — <code>ws://</code> / <code>wss://</code> / <code>tcp://</code> / <code>frame://</code> / <code>text://</code> 及自定义协议</li>
+<li>🔒 <strong>AES-256-CBC 加密</strong> — 所有内部通讯全程加密，SecretKey 双重认证</li>
+<li>⚖️ <strong>自动负载均衡</strong> — 最少连接数 / 随机两种路由模式</li>
+<li>📡 <strong>GatewaySDK</strong> — 从任意 Go 进程（HTTP 服务、定时任务、CLI）主动推送消息</li>
+<li>🔄 <strong>自动断线重连</strong> — Gateway / Worker / Register 三方均支持</li>
+<li>💓 <strong>心跳检测</strong> — 可配置间隔和超时踢出</li>
+<li>🛡️ <strong>多 Register 高可用</strong> — 任一 Register 宕机不影响正常运行</li>
+<li>📊 <strong>Dashboard 监控面板</strong> — 实时查看在线连接数 / Worker 处理次数</li>
+<li>🔗 <strong>完整 API</strong> — 37 个方法对标 PHP 版全覆盖（UID 绑定、Group、Session、踢人等）</li>
+</ul>
+<hr>
+<h2 id="heading-2">安装</h2>
+<pre class="chroma"><code><span class="line"><span class="cl">go get github.com/captainstdin/gateway-go@latest
+</span></span></code></pre><hr>
+<h2 id="heading-3">快速开始</h2>
+<h3 id="worker--echo-">最小示例（Worker + echo 回显）</h3>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="kn">package</span><span class="w"> </span><span class="nx">main</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="kn">import</span><span class="w"> </span><span class="p">(</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="s">&#34;fmt&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="s">&#34;log&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="s">&#34;github.com/captainstdin/gateway-go/pkg/gateway_api&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="s">&#34;github.com/captainstdin/gateway-go/pkg/worker&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="kd">func</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">bw</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">worker</span><span class="p">.</span><span class="nf">New</span><span class="p">(</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="s">&#34;my-worker&#34;</span><span class="p">,</span><span class="w">                 </span><span class="c1">// Worker 名称</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="mi">0</span><span class="p">,</span><span class="w">                           </span><span class="c1">// Worker ID（多实例时需不同）</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="p">[]</span><span class="kt">string</span><span class="p">{</span><span class="s">&#34;127.0.0.1:51234&#34;</span><span class="p">},</span><span class="w"> </span><span class="c1">// Register 地址</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="s">&#34;my-secret-key&#34;</span><span class="p">,</span><span class="w">             </span><span class="c1">// 认证密钥</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">bw</span><span class="p">.</span><span class="nx">OnWebSocketConnect</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kd">func</span><span class="p">(</span><span class="nx">clientID</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nx">data</span><span class="w"> </span><span class="p">[]</span><span class="kt">byte</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nx">gateway_api</span><span class="p">.</span><span class="nf">SendToClient</span><span class="p">(</span><span class="nx">clientID</span><span class="p">,</span><span class="w"> </span><span class="p">[]</span><span class="nb">byte</span><span class="p">(</span><span class="s">&#34;Welcome!&#34;</span><span class="p">))</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">bw</span><span class="p">.</span><span class="nx">OnMessage</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kd">func</span><span class="p">(</span><span class="nx">clientID</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nx">message</span><span class="w"> </span><span class="p">[]</span><span class="kt">byte</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nx">gateway_api</span><span class="p">.</span><span class="nf">SendToClient</span><span class="p">(</span><span class="nx">clientID</span><span class="p">,</span><span class="w"> </span><span class="p">[]</span><span class="nb">byte</span><span class="p">(</span><span class="nx">fmt</span><span class="p">.</span><span class="nf">Sprintf</span><span class="p">(</span><span class="s">&#34;echo: %s&#34;</span><span class="p">,</span><span class="w"> </span><span class="nx">message</span><span class="p">)))</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">gateway_api</span><span class="p">.</span><span class="nf">SetBusinessWorker</span><span class="p">(</span><span class="nx">bw</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">bw</span><span class="p">.</span><span class="nf">Run</span><span class="p">();</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nx">log</span><span class="p">.</span><span class="nf">Fatal</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="p">}</span><span class="w">
+</span></span></span></code></pre><h3 id="-register--gateway--worker">三合一（单进程嵌入 Register + Gateway + Worker）</h3>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="kn">package</span><span class="w"> </span><span class="nx">main</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="kn">import</span><span class="w"> </span><span class="p">(</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="s">&#34;log&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="s">&#34;github.com/captainstdin/gateway-go/pkg/gateway&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="s">&#34;github.com/captainstdin/gateway-go/pkg/gateway_api&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="s">&#34;github.com/captainstdin/gateway-go/pkg/register&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="s">&#34;github.com/captainstdin/gateway-go/pkg/worker&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="kd">func</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">secretKey</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&#34;my-secret-key&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">// 1. Register</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">r</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">register</span><span class="p">.</span><span class="nf">New</span><span class="p">(</span><span class="s">&#34;0.0.0.0:51234&#34;</span><span class="p">,</span><span class="w"> </span><span class="nx">secretKey</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">go</span><span class="w"> </span><span class="nx">r</span><span class="p">.</span><span class="nf">Run</span><span class="p">()</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">// 2. Gateway</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">g</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">gateway</span><span class="p">.</span><span class="nf">New</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">gateway</span><span class="p">.</span><span class="nx">Config</span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nx">ListenAddrs</span><span class="p">:</span><span class="w">  </span><span class="p">[]</span><span class="kt">string</span><span class="p">{</span><span class="s">&#34;ws://0.0.0.0:7272&#34;</span><span class="p">},</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nx">RegisterAddr</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span><span class="kt">string</span><span class="p">{</span><span class="s">&#34;127.0.0.1:51234&#34;</span><span class="p">},</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nx">SecretKey</span><span class="p">:</span><span class="w">    </span><span class="nx">secretKey</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">})</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">go</span><span class="w"> </span><span class="nx">g</span><span class="p">.</span><span class="nf">Run</span><span class="p">()</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">// 3. Worker（阻塞）</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">bw</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">worker</span><span class="p">.</span><span class="nf">New</span><span class="p">(</span><span class="s">&#34;worker&#34;</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="p">[]</span><span class="kt">string</span><span class="p">{</span><span class="s">&#34;127.0.0.1:51234&#34;</span><span class="p">},</span><span class="w"> </span><span class="nx">secretKey</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">bw</span><span class="p">.</span><span class="nx">OnMessage</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kd">func</span><span class="p">(</span><span class="nx">clientID</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nx">msg</span><span class="w"> </span><span class="p">[]</span><span class="kt">byte</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nx">gateway_api</span><span class="p">.</span><span class="nf">SendToClient</span><span class="p">(</span><span class="nx">clientID</span><span class="p">,</span><span class="w"> </span><span class="nx">msg</span><span class="p">)</span><span class="w"> </span><span class="c1">// echo</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">gateway_api</span><span class="p">.</span><span class="nf">SetBusinessWorker</span><span class="p">(</span><span class="nx">bw</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">bw</span><span class="p">.</span><span class="nf">Run</span><span class="p">();</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nx">log</span><span class="p">.</span><span class="nf">Fatal</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="p">}</span><span class="w">
+</span></span></span></code></pre><h3 id="gatewaysdk">外部推送（GatewaySDK）</h3>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="kn">package</span><span class="w"> </span><span class="nx">main</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="kn">import</span><span class="w"> </span><span class="p">(</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="s">&#34;fmt&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="s">&#34;github.com/captainstdin/gateway-go/pkg/gateway_sdk&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="kd">func</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">client</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">gateway_sdk</span><span class="p">.</span><span class="nf">New</span><span class="p">(</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="p">[]</span><span class="kt">string</span><span class="p">{</span><span class="s">&#34;127.0.0.1:51234&#34;</span><span class="p">},</span><span class="w"> </span><span class="c1">// Register 地址</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="s">&#34;my-secret-key&#34;</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">defer</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nf">Close</span><span class="p">()</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">// 广播给所有在线用户</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">client</span><span class="p">.</span><span class="nf">SendToAll</span><span class="p">([]</span><span class="nb">byte</span><span class="p">(</span><span class="s">`{&#34;type&#34;:&#34;announcement&#34;,&#34;msg&#34;:&#34;系统维护通知&#34;}`</span><span class="p">))</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">// 向指定 UID 推送</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">client</span><span class="p">.</span><span class="nf">SendToUID</span><span class="p">(</span><span class="s">&#34;user_100&#34;</span><span class="p">,</span><span class="w"> </span><span class="p">[]</span><span class="nb">byte</span><span class="p">(</span><span class="s">`{&#34;type&#34;:&#34;notify&#34;,&#34;msg&#34;:&#34;你有新消息&#34;}`</span><span class="p">))</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="c1">// 查询在线人数</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">count</span><span class="p">,</span><span class="w"> </span><span class="nx">_</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nf">GetAllClientCount</span><span class="p">()</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;在线:&#34;</span><span class="p">,</span><span class="w"> </span><span class="nx">count</span><span class="p">)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="p">}</span><span class="w">
+</span></span></span></code></pre><hr>
+<h2 id="heading-4">以独立进程运行</h2>
+<pre class="chroma"><code><span class="line"><span class="cl"><span class="c1"># 编译</span>
+</span></span><span class="line"><span class="cl">go build -o bin/register  ./cmd/register
+</span></span><span class="line"><span class="cl">go build -o bin/gateway   ./cmd/gateway
+</span></span><span class="line"><span class="cl">go build -o bin/worker    ./cmd/worker
+</span></span><span class="line"><span class="cl">go build -o bin/dashboard ./cmd/dashboard
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># 启动（三个终端）</span>
+</span></span><span class="line"><span class="cl">./bin/register -listen <span class="s2">&#34;text://0.0.0.0:51234&#34;</span> -key <span class="s2">&#34;my-secret-key&#34;</span>
+</span></span><span class="line"><span class="cl">./bin/gateway  -listen <span class="s2">&#34;ws://0.0.0.0:7272&#34;</span>    -key <span class="s2">&#34;my-secret-key&#34;</span> -register <span class="s2">&#34;127.0.0.1:51234&#34;</span>
+</span></span><span class="line"><span class="cl">./bin/worker                                   -key <span class="s2">&#34;my-secret-key&#34;</span> -register <span class="s2">&#34;127.0.0.1:51234&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># 可选：监控面板</span>
+</span></span><span class="line"><span class="cl">./bin/dashboard -listen <span class="s2">&#34;0.0.0.0:8686&#34;</span> -key <span class="s2">&#34;my-secret-key&#34;</span> -register <span class="s2">&#34;127.0.0.1:51234&#34;</span>
+</span></span></code></pre><p>WSS（WebSocket + TLS）：</p>
+<pre class="chroma"><code><span class="line"><span class="cl">./bin/gateway -listen <span class="s2">&#34;wss://0.0.0.0:7443&#34;</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl">              -tls-cert cert.pem -tls-key key.pem <span class="se">\
+</span></span></span><span class="line"><span class="cl">              -key <span class="s2">&#34;my-secret-key&#34;</span>
+</span></span></code></pre><hr>
+<h2 id="heading-5">包结构</h2>
+<pre><code>pkg/
+├── register/      注册中心（服务发现）
+├── gateway/       网关（管理客户端连接）
+├── worker/        业务 Worker（事件回调）
+├── gateway_api/   Worker 内部推送 API（包级函数）
+├── gateway_sdk/   外部进程推送 SDK（实例方法）
+├── protocol/      内部二进制协议（GatewayProtocol）
+├── crypto/        AES-256-CBC 加解密
+└── context/       clientID 编解码工具
+
+cmd/
+├── register/      Register 独立可执行程序
+├── gateway/       Gateway 独立可执行程序
+├── worker/        Worker 独立可执行程序（内置 echo 示例）
+├── dashboard/     监控面板
+└── gateway-edit/  自定义协议示例
+</code></pre>
+<hr>
+<h2 id="heading-6">文档</h2>
+<table>
+<thead>
+<tr>
+<th>文档</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="docs/architecture.html">架构原理</a></td>
+<td>系统设计、组件详解、通讯协议、安全机制</td>
+</tr>
+<tr>
+<td><a href="docs/usage.html">使用指南</a></td>
+<td>快速开始、配置参数、部署方式、协议配置</td>
+</tr>
+<tr>
+<td><a href="docs/code-usage.html">代码开发指南</a></td>
+<td>Worker 事件回调、GatewaySDK 完整示例</td>
+</tr>
+<tr>
+<td><a href="docs/gateway-sdk.html">GatewaySDK</a></td>
+<td>外部推送 SDK 完整 API 参考</td>
+</tr>
+<tr>
+<td><a href="docs/cheatsheet.html">速查手册</a></td>
+<td>30 秒速览整个系统</td>
+</tr>
+<tr>
+<td><a href="docs/best-practices.html">开发注意事项</a></td>
+<td>包大小限制、Session、并发安全</td>
+</tr>
+<tr>
+<td><a href="docs/php-vs-go.html">PHP vs Go 对比</a></td>
+<td>与 PHP GatewayWorker 的完整对比</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="license">License</h2>
+<p>MIT</p>
+
+        </div>
+    </div>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            var menuBtn = document.getElementById('menu-btn');
+            var sidebar = document.getElementById('sidebar');
+            var backdrop = document.getElementById('backdrop');
+
+            if (menuBtn && sidebar && backdrop) {
+                menuBtn.addEventListener('click', function() {
+                    sidebar.classList.add('open');
+                    backdrop.classList.add('open');
+                    document.body.style.overflow = 'hidden';
+                });
+
+                backdrop.addEventListener('click', function() {
+                    sidebar.classList.remove('open');
+                    backdrop.classList.remove('open');
+                    document.body.style.overflow = '';
+                });
+            }
+
+            var links = document.querySelectorAll('.sidebar a');
+            var currentUrl = window.location.href.split('#')[0]; 
+            links.forEach(function(link) {
+                var linkUrl = link.href.split('#')[0];
+                if (linkUrl === currentUrl || (currentUrl.endsWith('/') && linkUrl.endsWith('/index.html'))) {
+                    link.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
